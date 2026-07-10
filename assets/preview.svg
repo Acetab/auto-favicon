@@ -22,8 +22,8 @@
   <text x="190" y="98" fill="#DDE4F6" font-family="Microsoft YaHei,Arial,sans-serif" font-size="17">自动网站图标 · Auto Favicon</text>
   <line x1="700" y1="120" x2="700" y2="706" stroke="#E8EBF3"/>
   <g font-family="Microsoft YaHei,Arial,sans-serif">
-    <text x="126" y="185" fill="#202638" font-size="30" font-weight="700">网页资料</text>
-    <text x="126" y="220" fill="#7B849C" font-size="16">链接前自动显示清晰的网站图标，增强笔记辨识度</text>
+    <text x="126" y="185" fill="#202638" font-size="30" font-weight="700">Web Links / 网页资料</text>
+    <text x="126" y="220" fill="#7B849C" font-size="15">Clear favicons before links · 链接前自动显示网站图标</text>
     <g transform="translate(126 264)">
       <rect width="516" height="70" rx="14" fill="#F7F9FD" stroke="#E7EAF2"/>
       <rect x="18" y="17" width="36" height="36" rx="10" fill="#FF3B30"/>
@@ -44,20 +44,20 @@
       <rect width="516" height="70" rx="14" fill="#F7F9FD" stroke="#E7EAF2"/>
       <rect x="18" y="17" width="36" height="36" rx="10" fill="url(#brand)"/>
       <text x="36" y="43" fill="#fff" text-anchor="middle" font-size="22" font-weight="700">S</text>
-      <text x="72" y="31" fill="#252B3B" font-size="18" font-weight="600">冷门网站也有本地图标</text>
-      <text x="72" y="53" fill="#8991A6" font-size="13">无法获取时生成彩色域名字母</text>
+      <text x="72" y="31" fill="#252B3B" font-size="18" font-weight="600">Local fallback / 本地图标兜底</text>
+      <text x="72" y="53" fill="#8991A6" font-size="13">Colorful domain monogram · 彩色域名字母</text>
     </g>
-    <text x="746" y="174" fill="#202638" font-size="23" font-weight="700">插件设置</text>
-    <text x="746" y="219" fill="#737C92" font-size="14">获取策略</text>
+    <text x="746" y="174" fill="#202638" font-size="22" font-weight="700">Settings / 设置</text>
+    <text x="746" y="219" fill="#737C92" font-size="14">Strategy / 策略</text>
     <rect x="746" y="235" width="158" height="38" rx="9" fill="#F4F6FB" stroke="#E3E7F0"/>
-    <text x="760" y="260" fill="#30384C" font-size="14">普通网络（推荐）</text>
-    <text x="746" y="313" fill="#737C92" font-size="14">第三方图标服务</text>
+    <text x="760" y="260" fill="#30384C" font-size="13">Standard / 普通</text>
+    <text x="746" y="313" fill="#737C92" font-size="14">Provider / 服务</text>
     <rect x="746" y="329" width="158" height="38" rx="9" fill="#F4F6FB" stroke="#E3E7F0"/>
-    <text x="760" y="354" fill="#30384C" font-size="14">自动组合</text>
-    <text x="746" y="407" fill="#737C92" font-size="14">无图标时</text>
+    <text x="760" y="354" fill="#30384C" font-size="13">Automatic / 自动</text>
+    <text x="746" y="407" fill="#737C92" font-size="14">Fallback / 兜底</text>
     <rect x="746" y="423" width="158" height="38" rx="9" fill="#F4F6FB" stroke="#E3E7F0"/>
-    <text x="760" y="448" fill="#30384C" font-size="14">彩色域名字母</text>
+    <text x="760" y="448" fill="#30384C" font-size="13">Monogram / 字母</text>
     <rect x="746" y="502" width="158" height="42" rx="10" fill="url(#brand)"/>
-    <text x="825" y="529" fill="#fff" text-anchor="middle" font-size="15" font-weight="600">重新获取全部图标</text>
+    <text x="825" y="529" fill="#fff" text-anchor="middle" font-size="13" font-weight="600">Refresh / 重新获取</text>
   </g>
 </svg>

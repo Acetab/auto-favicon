@@ -14,6 +14,7 @@ declare module "siyuan" {
 
   export class Plugin {
     setting?: Setting;
+    i18n: Record<string, any>;
     loadData<T = any>(name: string): Promise<T>;
     saveData(name: string, data: unknown): Promise<void>;
   }

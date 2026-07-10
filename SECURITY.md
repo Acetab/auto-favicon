@@ -1,3 +1,13 @@
+# Security
+
+Do not post logs containing private notes, internal domains, access tokens, or other sensitive information in public issues.
+
+Depending on the selected strategy, the plugin may access linked websites or third-party favicon services. Localhost and private-network addresses are not resolved automatically or sent to external services.
+
+For vulnerabilities that could expose note content, bypass private-network restrictions, or write arbitrary files, use the repository's private security-reporting feature.
+
+---
+
 # 安全说明
 
 请不要在公开 Issue 中提交包含私人笔记、内网域名、访问令牌或其他敏感信息的日志。

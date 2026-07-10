@@ -1,3 +1,25 @@
+# Contributing
+
+Issues and improvement suggestions are welcome. When reporting a problem, please include:
+
+- SiYuan version and operating system;
+- plugin version and network strategy;
+- the complete public URL whose icon cannot be resolved;
+- whether link-icon or another link-style plugin is enabled;
+- relevant console errors with private information removed.
+
+Before submitting code, run:
+
+```powershell
+npm install
+npm run check
+npm run build
+```
+
+Do not commit `node_modules`, local caches, SiYuan workspace data, or API keys.
+
+---
+
 # 参与贡献
 
 欢迎提交问题和改进建议。报告问题时，请尽量附上：

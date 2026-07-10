@@ -7,7 +7,8 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         { src: "plugin.json", dest: "." },
-        { src: "README.md", dest: "." },
+        { src: "README*.md", dest: "." },
+        { src: "i18n", dest: "." },
         { src: "LICENSE", dest: "." },
         { src: "THIRD_PARTY_NOTICES.md", dest: "." },
         { src: "icon.png", dest: "." },

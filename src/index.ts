@@ -72,6 +72,15 @@ export default class AutoFaviconPlugin extends Plugin {
   }
 
   private addSetting() {
+    const t = (key: string) => String(this.i18n[key] ?? key);
+    const addOptions = (select: HTMLSelectElement, options: Array<[string, string]>) => {
+      for (const [value, label] of options) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        select.appendChild(option);
+      }
+    };
     const enabled = document.createElement("input");
     enabled.type = "checkbox";
     enabled.className = "b3-switch fn__flex-center";
@@ -89,27 +98,30 @@ export default class AutoFaviconPlugin extends Plugin {
 
     const providerPreset = document.createElement("select");
     providerPreset.className = "b3-select fn__size200";
-    providerPreset.innerHTML = `
-      <option value="auto">自动组合（推荐）</option>
-      <option value="faviconkit">FaviconKit</option>
-      <option value="faviconim">favicon.im</option>
-      <option value="iconhorse">Icon Horse</option>
-      <option value="custom">自定义服务</option>`;
+    addOptions(providerPreset, [
+      ["auto", t("providerAuto")],
+      ["faviconkit", t("providerFaviconKit")],
+      ["faviconim", t("providerFaviconIm")],
+      ["iconhorse", t("providerIconHorse")],
+      ["custom", t("providerCustom")],
+    ]);
     providerPreset.value = this.settings.providerPreset;
 
     const resolverMode = document.createElement("select");
     resolverMode.className = "b3-select fn__size200";
-    resolverMode.innerHTML = `
-      <option value="mainland">普通网络（推荐）</option>
-      <option value="global">代理网络 / 尽量获取</option>
-      <option value="direct">只访问链接网站（隐私优先）</option>`;
+    addOptions(resolverMode, [
+      ["mainland", t("strategyStandard")],
+      ["global", t("strategyProxy")],
+      ["direct", t("strategyDirect")],
+    ]);
     resolverMode.value = this.settings.resolverMode;
 
     const fallbackMode = document.createElement("select");
     fallbackMode.className = "b3-select fn__size200";
-    fallbackMode.innerHTML = `
-      <option value="monogram">彩色域名字母</option>
-      <option value="none">不显示图标</option>`;
+    addOptions(fallbackMode, [
+      ["monogram", t("fallbackMonogram")],
+      ["none", t("fallbackNone")],
+    ]);
     fallbackMode.value = this.settings.fallbackMode;
 
     const iconSize = document.createElement("input");
@@ -130,19 +142,19 @@ export default class AutoFaviconPlugin extends Plugin {
 
     const clear = document.createElement("button");
     clear.className = "b3-button b3-button--outline";
-    clear.textContent = "清除图标缓存";
+    clear.textContent = t("clearCache");
     clear.addEventListener("click", async () => {
       await this.clearCache();
-      showMessage("网站图标缓存已清除");
+      showMessage(t("cacheCleared"));
     });
 
     const rebuild = document.createElement("button");
     rebuild.className = "b3-button b3-button--text";
-    rebuild.textContent = "重新获取全部图标";
+    rebuild.textContent = t("refreshAll");
     rebuild.addEventListener("click", async () => {
       await this.clearCache();
       this.scheduleScan();
-      showMessage("缓存已重置，将按当前策略重新获取图标");
+      showMessage(t("cacheReset"));
     });
 
     const cacheActions = document.createElement("div");
@@ -166,48 +178,48 @@ export default class AutoFaviconPlugin extends Plugin {
       },
     });
     this.setting.addItem({
-      title: "自动显示网站图标",
-      description: "在外链左侧显示 favicon。首次遇到域名时才会联网获取。",
+      title: t("enableTitle"),
+      description: t("enableDescription"),
       createActionElement: () => enabled,
     });
     this.setting.addItem({
-      title: "获取策略",
-      description: "普通网络：网站自身 + 所选服务，不请求 Google/DuckDuckGo；代理网络：额外尝试 Google/DuckDuckGo；隐私优先：只访问链接网站，失败后用本地图标兜底。",
+      title: t("strategyTitle"),
+      description: t("strategyDescription"),
       createActionElement: () => resolverMode,
     });
     this.setting.addItem({
-      title: "覆盖 link-icon 网站图标",
-      description: "默认关闭：link-icon 已收录或自定义的图标优先，本插件补充其他域名。开启后优先显示自动获取的真实 favicon。",
+      title: t("overrideTitle"),
+      description: t("overrideDescription"),
       createActionElement: () => preferDynamic,
     });
     this.setting.addItem({
-      title: "第三方图标服务",
-      description: "自动组合依次尝试 FaviconKit 和 favicon.im；也可以固定使用 FaviconKit、favicon.im 或 Icon Horse。隐私优先模式会忽略这里。",
+      title: t("providerTitle"),
+      description: t("providerDescription"),
       createActionElement: () => providerPreset,
     });
     this.setting.addItem({
-      title: "自定义服务模板",
-      description: "仅选择“自定义服务”时生效，用 {domain} 表示域名，例如 https://example.com/favicon/{domain}。",
+      title: t("customProviderTitle"),
+      description: t("customProviderDescription"),
       createActionElement: () => provider,
     });
     this.setting.addItem({
-      title: "无图标时",
-      description: "彩色字母完全在本地生成，保证冷门或无法访问的网站也有视觉标识。",
+      title: t("fallbackTitle"),
+      description: t("fallbackDescription"),
       createActionElement: () => fallbackMode,
     });
     this.setting.addItem({
-      title: "图标尺寸",
-      description: "相对于正文文字的倍数，建议 0.9–1.2。",
+      title: t("sizeTitle"),
+      description: t("sizeDescription"),
       createActionElement: () => iconSize,
     });
     this.setting.addItem({
-      title: "缓存有效期（天）",
-      description: "过期后自动重新获取；填写 0 表示永久缓存。",
+      title: t("cacheDaysTitle"),
+      description: t("cacheDaysDescription"),
       createActionElement: () => cacheDays,
     });
     this.setting.addItem({
-      title: "缓存管理",
-      description: `当前缓存 ${Object.keys(this.cache).length} 个域名。修改获取策略后可重新获取。`,
+      title: t("cacheTitle"),
+      description: t("cacheDescription").replace("{count}", String(Object.keys(this.cache).length)),
       createActionElement: () => cacheActions,
     });
   }
