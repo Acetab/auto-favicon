@@ -1,0 +1,27 @@
+{
+  "name": "auto-favicon",
+  "author": "Acetab",
+  "url": "https://github.com/Acetab/auto-favicon",
+  "version": "0.5.0",
+  "minAppVersion": "3.1.6",
+  "backends": ["all"],
+  "frontends": ["desktop", "mobile"],
+  "disabledInPublish": false,
+  "displayName": {
+    "default": "自动网站图标",
+    "zh-CN": "自动网站图标"
+  },
+  "description": {
+    "default": "自动为网页链接获取并缓存网站图标，支持多来源、网络策略及与 link-icon 配合使用。",
+    "zh-CN": "自动为网页链接获取并缓存网站图标，支持多来源、网络策略及与 link-icon 配合使用。"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh-CN": "README.md"
+  },
+  "funding": {
+    "openCollective": "",
+    "custom": []
+  },
+  "keywords": ["网站图标", "favicon", "链接", "link icon", "Vibe Coding"]
+}

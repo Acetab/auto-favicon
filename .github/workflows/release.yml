@@ -1,0 +1,45 @@
+name: Release plugin
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate tag and plugin version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION="$(node -p "require('./plugin.json').version")"
+          test "$TAG" = "$VERSION" || { echo "Tag $TAG does not match plugin version $VERSION"; exit 1; }
+
+      - name: Check and build
+        run: |
+          npm run check
+          npm run build
+
+      - name: Create marketplace package
+        run: cd dist && zip -r ../package.zip .
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" package.zip --title "$GITHUB_REF_NAME" --generate-notes

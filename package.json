@@ -1,0 +1,24 @@
+{
+  "name": "siyuan-auto-favicon",
+  "version": "0.5.0",
+  "private": false,
+  "type": "module",
+  "author": "Acetab",
+  "license": "MIT",
+  "repository": "https://github.com/Acetab/auto-favicon",
+  "homepage": "https://github.com/Acetab/auto-favicon",
+  "scripts": {
+    "assets": "node scripts/render-assets.mjs",
+    "dev": "vite build --watch --mode development",
+    "build": "vite build",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "sharp": "^0.35.3",
+    "siyuan": "^1.0.3",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vite-plugin-static-copy": "^2.2.0"
+  }
+}

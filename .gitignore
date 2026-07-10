@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dev/
+package.zip
+auto-favicon.zip
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

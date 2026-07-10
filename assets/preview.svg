@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <defs>
+    <linearGradient id="page" x1="60" y1="40" x2="960" y2="730" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EEF3FF"/><stop offset="1" stop-color="#F8F5FF"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#5B8CFF"/><stop offset="1" stop-color="#6554D9"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#33416C" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="768" fill="url(#page)"/>
+  <circle cx="898" cy="90" r="135" fill="#DCD5FF" opacity=".45"/>
+  <circle cx="95" cy="698" r="160" fill="#CDE6FF" opacity=".52"/>
+  <g filter="url(#shadow)">
+    <rect x="72" y="62" width="880" height="644" rx="24" fill="#fff"/>
+  </g>
+  <rect x="72" y="62" width="880" height="58" rx="24" fill="#202638"/>
+  <rect x="72" y="96" width="880" height="24" fill="#202638"/>
+  <circle cx="108" cy="91" r="7" fill="#FF6B6B"/><circle cx="132" cy="91" r="7" fill="#FFD166"/><circle cx="156" cy="91" r="7" fill="#4DDBA8"/>
+  <text x="190" y="98" fill="#DDE4F6" font-family="Microsoft YaHei,Arial,sans-serif" font-size="17">自动网站图标 · Auto Favicon</text>
+  <line x1="700" y1="120" x2="700" y2="706" stroke="#E8EBF3"/>
+  <g font-family="Microsoft YaHei,Arial,sans-serif">
+    <text x="126" y="185" fill="#202638" font-size="30" font-weight="700">网页资料</text>
+    <text x="126" y="220" fill="#7B849C" font-size="16">链接前自动显示清晰的网站图标，增强笔记辨识度</text>
+    <g transform="translate(126 264)">
+      <rect width="516" height="70" rx="14" fill="#F7F9FD" stroke="#E7EAF2"/>
+      <rect x="18" y="17" width="36" height="36" rx="10" fill="#FF3B30"/>
+      <path d="m32 26 12 9-12 9z" fill="#fff"/>
+      <text x="72" y="31" fill="#252B3B" font-size="18" font-weight="600">YouTube</text>
+      <text x="72" y="53" fill="#8991A6" font-size="13">youtube.com</text>
+      <text x="472" y="42" fill="#A1A8B8" font-size="21">↗</text>
+    </g>
+    <g transform="translate(126 350)">
+      <rect width="516" height="70" rx="14" fill="#F7F9FD" stroke="#E7EAF2"/>
+      <rect x="18" y="17" width="36" height="36" rx="10" fill="#477BFF"/>
+      <path d="m27 30 9-6 11 6-11 6zM27 39l9-6 11 6-11 6z" fill="#DCE8FF"/>
+      <text x="72" y="31" fill="#252B3B" font-size="18" font-weight="600">金山文档</text>
+      <text x="72" y="53" fill="#8991A6" font-size="13">kdocs.cn</text>
+      <text x="472" y="42" fill="#A1A8B8" font-size="21">↗</text>
+    </g>
+    <g transform="translate(126 436)">
+      <rect width="516" height="70" rx="14" fill="#F7F9FD" stroke="#E7EAF2"/>
+      <rect x="18" y="17" width="36" height="36" rx="10" fill="url(#brand)"/>
+      <text x="36" y="43" fill="#fff" text-anchor="middle" font-size="22" font-weight="700">S</text>
+      <text x="72" y="31" fill="#252B3B" font-size="18" font-weight="600">冷门网站也有本地图标</text>
+      <text x="72" y="53" fill="#8991A6" font-size="13">无法获取时生成彩色域名字母</text>
+    </g>
+    <text x="746" y="174" fill="#202638" font-size="23" font-weight="700">插件设置</text>
+    <text x="746" y="219" fill="#737C92" font-size="14">获取策略</text>
+    <rect x="746" y="235" width="158" height="38" rx="9" fill="#F4F6FB" stroke="#E3E7F0"/>
+    <text x="760" y="260" fill="#30384C" font-size="14">普通网络（推荐）</text>
+    <text x="746" y="313" fill="#737C92" font-size="14">第三方图标服务</text>
+    <rect x="746" y="329" width="158" height="38" rx="9" fill="#F4F6FB" stroke="#E3E7F0"/>
+    <text x="760" y="354" fill="#30384C" font-size="14">自动组合</text>
+    <text x="746" y="407" fill="#737C92" font-size="14">无图标时</text>
+    <rect x="746" y="423" width="158" height="38" rx="9" fill="#F4F6FB" stroke="#E3E7F0"/>
+    <text x="760" y="448" fill="#30384C" font-size="14">彩色域名字母</text>
+    <rect x="746" y="502" width="158" height="42" rx="10" fill="url(#brand)"/>
+    <text x="825" y="529" fill="#fff" text-anchor="middle" font-size="15" font-weight="600">重新获取全部图标</text>
+  </g>
+</svg>

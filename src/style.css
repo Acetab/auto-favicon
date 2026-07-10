@@ -1,0 +1,5 @@
+/*
+ * Favicon rules are generated at runtime in <head>. No style or data attribute
+ * is written into SiYuan's editable document DOM, so nothing is serialized as
+ * block IAL text such as {: style="..."}.
+ */
