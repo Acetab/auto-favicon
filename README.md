@@ -2,110 +2,70 @@
 
 # Auto Favicon
 
-I originally used [chenshinshi/link-icon](https://github.com/chenshinshi/link-icon) and found its curated website icons and block-reference icons very useful. As the number of websites in my notes grew, a static icon library could no longer cover every domain. Inspired by its approach of displaying icons before links, I built this plugin through **Vibe Coding** to retrieve website icons automatically.
+Auto Favicon automatically retrieves, displays, and locally caches website icons for HTTP/HTTPS links in SiYuan. When no usable favicon is available, it can generate a colorful domain monogram locally.
 
-This project is not intended to replace `link-icon`. They work well together: `link-icon` provides curated icons, custom icons, and block-reference icons, while Auto Favicon fills in websites that are not covered by its library.
-
-The plugin is still evolving. When reporting a problem, please include the URL, your SiYuan version, network strategy, and whether another link-style plugin is enabled.
-
-![Plugin preview](preview.png)
+![Auto Favicon in SiYuan](screenshot.png)
 
 ## Features
 
-- Detect HTTP/HTTPS links in documents and display a website icon before each link.
-- Discover `rel=icon`, Apple Touch Icon, Web App Manifest icons, and `/favicon.ico`.
-- Support FaviconKit, favicon.im, Icon Horse, automatic multi-source resolution, and custom services.
-- Provide Standard Network, Proxy Network, and Direct Website Only strategies.
-- Cache downloaded icons locally in the SiYuan workspace.
-- Generate a colorful domain monogram locally when no real favicon is available.
-- Configure icon size, cache lifetime, and full cache refresh.
-- Avoid inline styles in editable document content.
+- Discover icons from the target page, `/favicon.ico`, web manifests, and optional favicon services.
+- Choose Standard Network, Proxy Network, or Direct Website Only.
+- Cache verified icons in the SiYuan workspace and reuse them without external requests.
+- Customize fallback monogram colors, letters, and shapes globally or per domain.
+- Upload a custom icon, use an image URL, or choose from discovered candidates for a domain.
+- Work alongside **Link Icon** while preserving its curated and custom icons.
+- Use the top-bar menu to change the display strategy, refresh the current document, manage cache, or open settings.
 
-## Choosing a network strategy
+## Cache behavior
 
-| Strategy | Sources | Recommended for |
-|---|---|---|
-| Standard Network | The linked website and the selected third-party service; never Google or DuckDuckGo | Daily use and networks where Google/DDG are unavailable |
-| Proxy Network / Maximum Coverage | Standard sources plus Google and DuckDuckGo | A proxy that is available to SiYuan and maximum favicon coverage |
-| Direct Website Only | The target page, its manifest, and `/favicon.ico` only | Users who do not want domains sent to third-party favicon services |
+Opening a document scans its web links, but a fresh cached icon is loaded locally and is not downloaded again. New, expired, missing, damaged, or manually refreshed entries are retrieved using the selected network strategy.
 
-All strategies try the website itself first. Even if a foreign website cannot be opened directly, Standard Network may still show its real icon when the selected service has cached it. Otherwise, the plugin can use a local monogram. Direct Website Only strictly depends on whether SiYuan can reach the target website.
+- Default lifetime: 30 days.
+- Enter `0` to keep icons until they are manually cleared.
+- Generated monograms follow the same lifetime.
+- Failed domains are paused for 10 minutes during the current plugin session.
+- A failed manual refresh keeps the previous working icon.
+- Manually selected icons are pinned locally until automatic retrieval is restored; normal cache clearing and expiration do not remove them.
+- Icon files: `workspace/data/public/auto-favicon/`.
+- Cache index: `favicon-cache.json`, managed through SiYuan plugin storage; refresh targets retain only the scheme, host, and port.
 
-## Third-party favicon services
+Cache management supports refreshing the current document, refreshing every automatically cached domain, searching cached domains, and refreshing or deleting a single domain.
 
-- **Automatic (recommended):** tries FaviconKit, then favicon.im.
-- **FaviconKit:** currently provides good coverage for common domestic and international websites in testing.
-- **favicon.im:** resolves several favicon sources, but may time out on some networks.
-- **Icon Horse:** returns real icons for common websites and may return a letter placeholder for unknown domains.
-- **Custom service:** use `{domain}` as a placeholder, for example `https://example.com/favicon/{domain}`.
+## Working with Link Icon
 
-## Working with link-icon
+[Link Icon](https://github.com/chenshinshi/link-icon) is the marketplace name of the project whose repository name is `link-icon`. The recommended **Smart Fill** mode uses this priority:
 
-The two plugins have different roles:
+1. Link Icon curated or user-defined icons.
+2. A real favicon retrieved by Auto Favicon.
+3. A local colorful monogram.
+4. Link Icon's generic web placeholder.
 
-- `link-icon` supplies curated static icons, user-defined icons, and SiYuan block-reference icons.
-- Auto Favicon discovers, downloads, and caches favicons for domains that are not covered.
+Auto Favicon does not redistribute Link Icon's static icon library or copy its block-reference implementation. SiYuan document and block-reference icons remain handled by Link Icon.
 
-For the best combined experience, keep **Override link-icon website icons** disabled:
+Pinned custom icons follow the same display strategy: Smart Fill still yields to a meaningful Link Icon graphic, while Auto Favicon Priority displays the pinned icon first.
 
-1. Curated or user-defined `link-icon` icons take priority.
-2. Auto Favicon fills in uncovered domains automatically.
-3. SiYuan document and block-reference icons remain handled by `link-icon`.
+## Network and privacy
 
-Enable the override only if you prefer the favicon currently published by each website. This project does not duplicate link-icon's static icon library or block-reference feature.
+- **Standard Network:** Target website plus the selected favicon service; no Google or DuckDuckGo requests.
+- **Proxy Network:** Adds Google and DuckDuckGo for maximum coverage.
+- **Direct Website Only:** Contacts only the linked website, then uses a local fallback if needed.
 
-## Usage notes
+Localhost, `.local`, loopback, link-local, and private IP addresses are not sent to favicon services. Only the website domain is sent to third-party icon services—never note content, anchor text, or a complete page path.
 
-The plugin can decorate only elements that SiYuan has recognized as links. Plain-text URLs must first become hyperlinks—for example, paste a browser URL, press Space or Enter after typing, use Markdown link syntax, or apply SiYuan's link command to selected text.
+## Install and use
 
-The first icon for a domain may take a moment. After changing a strategy or service, use **Refresh all icons** in plugin settings.
+Install from the SiYuan Marketplace when available, or extract `package.zip` into `workspace/data/plugins/auto-favicon/`. Enable the plugin, open its settings to choose a network and display strategy, then use the Auto Favicon button in the top toolbar for common actions.
 
-## Privacy
+## Credits and license
 
-When a domain is first encountered, the plugin may ask the SiYuan kernel to access the public page and discover its icon. Standard Network may send the domain name to the selected favicon service. Proxy Network may additionally send it to Google and DuckDuckGo. Note content, anchor text, and full URL paths are not sent to favicon services.
+The idea of displaying icons before links and the original need for this plugin were inspired by [Link Icon](https://github.com/chenshinshi/link-icon). Auto Favicon was built through **Vibe Coding** and is licensed under the [MIT License](LICENSE).
 
-Localhost, local-network, and private addresses are not resolved automatically or sent to external services. Select Direct Website Only to minimize third-party requests.
+### 0.5.1
 
-## Inspiration and acknowledgements
+- Added Smart Fill compatibility with Link Icon.
+- Added customizable local monograms and per-domain overrides.
+- Added a top-bar quick menu and detailed cache management.
+- Added per-domain custom uploads, image URLs, and selectable discovered icon candidates.
+- Clarified cache behavior, storage location, and user-facing descriptions.
 
-- The original need, the visual approach of placing icons before links, and parts of the SiYuan link-structure adaptation were inspired by [chenshinshi/link-icon](https://github.com/chenshinshi/link-icon). Thanks to its author and contributors.
-- This package does not redistribute link-icon's static icon library or copy its block-reference implementation. Multi-source resolution, cache validation, network strategies, and settings are implemented independently in this project.
-- If you prefer link-icon's curated or manually configured icons, disable **Override link-icon website icons** and let the plugins complement each other.
-
-## License
-
-This project is released under the [MIT License](LICENSE). You may use, modify, and redistribute it while retaining the copyright and license notice.
-
-## Changelog
-
-### 0.5.0
-
-- Renamed the strategies to Standard Network, Proxy Network / Maximum Coverage, and Direct Website Only.
-- Removed Google and DuckDuckGo from Standard Network.
-- Added Automatic, FaviconKit, favicon.im, Icon Horse, and custom favicon services.
-- Automatic mode tries FaviconKit before favicon.im.
-- Renamed the icon-priority setting to Override link-icon website icons and disabled it by default for new installations.
-- Added English documentation and a bilingual settings interface that follows the SiYuan language.
-
-### 0.4.0
-
-- Added locally generated colorful monograms for websites without available icons.
-- Added icon size, cache lifetime, source priority, and cache-management settings.
-- Added cache statistics, cache clearing, and full icon refresh.
-- Added a cooldown after failed requests to avoid repeated network access while editing.
-
-### 0.3.0
-
-- Added layered resolution through page declarations, manifests, root paths, and multiple favicon services using the SiYuan network proxy.
-- Added cache validation and automatic cleanup of old or damaged icon files.
-- Display icons only after download, storage, reload, and image decoding all succeed.
-
-### 0.2.0
-
-- Stopped writing inline CSS variables into editable links.
-- Switched to a plugin-level stylesheet to prevent `{: style="..."}` text from appearing after edits.
-
-### 0.1.0
-
-- Initial release.
-- Detected external-link domains and fetched icons through favicon.im for local caching.
+See [GitHub Releases](https://github.com/Acetab/auto-favicon/releases) for the complete version history.

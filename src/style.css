@@ -3,3 +3,169 @@
  * is written into SiYuan's editable document DOM, so nothing is serialized as
  * block IAL text such as {: style="..."}.
  */
+
+.auto-favicon-cache-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auto-favicon-cache-manager {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 16px;
+}
+
+.auto-favicon-cache-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.auto-favicon-cache-summary code {
+  color: var(--b3-theme-on-surface);
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+.auto-favicon-cache-list {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--b3-border-color);
+  border-radius: var(--b3-border-radius);
+}
+
+.auto-favicon-cache-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--b3-border-color);
+}
+
+.auto-favicon-cache-row:last-child {
+  border-bottom: 0;
+}
+
+.auto-favicon-cache-info {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+}
+
+.auto-favicon-cache-info strong,
+.auto-favicon-cache-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auto-favicon-cache-info span {
+  color: var(--b3-theme-on-surface);
+  font-size: 0.82em;
+}
+
+.auto-favicon-cache-row-actions {
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.auto-favicon-cache-empty {
+  padding: 28px 16px;
+  text-align: center;
+}
+
+.auto-favicon-picker {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 16px;
+}
+
+.auto-favicon-picker-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auto-favicon-picker-controls input[type="file"] {
+  max-width: 240px;
+}
+
+.auto-favicon-picker-status {
+  flex: 0 0 auto;
+}
+
+.auto-favicon-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.auto-favicon-candidate-card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 8px;
+  color: var(--b3-theme-on-background);
+  background: var(--b3-theme-surface);
+  border: 1px solid var(--b3-border-color);
+  border-radius: var(--b3-border-radius);
+  cursor: pointer;
+}
+
+.auto-favicon-candidate-card:hover,
+.auto-favicon-candidate-card:focus {
+  border-color: var(--b3-theme-primary);
+  background: var(--b3-theme-primary-lightest);
+}
+
+.auto-favicon-candidate-card img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.auto-favicon-candidate-card span {
+  width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .auto-favicon-cache-manager {
+    padding: 12px;
+  }
+
+  .auto-favicon-cache-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .auto-favicon-cache-row-actions {
+    justify-content: flex-end;
+  }
+
+  .auto-favicon-picker {
+    padding: 12px;
+  }
+
+  .auto-favicon-picker-controls > * {
+    flex: 1 1 100%;
+    max-width: none !important;
+  }
+}

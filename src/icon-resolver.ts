@@ -22,29 +22,42 @@ export type ResolvedIcon = {
   source: string;
 };
 
+export type ResolvedIconCandidate = ResolvedIcon & {
+  url: string;
+};
+
 export type ResolverMode = "mainland" | "global" | "direct";
 export type FallbackMode = "monogram" | "none";
 export type ProviderPreset = "auto" | "faviconkit" | "faviconim" | "iconhorse" | "custom";
+export type MonogramColorMode = "domain" | "custom";
+export type MonogramShape = "rounded" | "circle" | "square";
+
+export type MonogramStyle = {
+  colorMode: MonogramColorMode;
+  primary: string;
+  secondary: string;
+  text: string;
+  shape: MonogramShape;
+  letter?: string;
+};
 
 export type ResolverOptions = {
   provider: string;
   providerPreset: ProviderPreset;
   mode: ResolverMode;
   fallback: FallbackMode;
+  monogramStyle?: MonogramStyle;
 };
 
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
+const MAX_CANDIDATE_ATTEMPTS = 16;
+const MAX_CANDIDATE_RESULTS = 8;
 
 export async function resolveBestIcon(targetUrl: string, options: ResolverOptions): Promise<ResolvedIcon | null> {
   const target = new URL(targetUrl);
   const domain = target.hostname.toLowerCase();
-  const candidates: Candidate[] = [];
-
   if (!isSafePublicTarget(target)) return null;
-  candidates.push(...await discoverPageIcons(target));
-  candidates.push({ url: new URL("/favicon.ico", target.origin).href, score: 10, source: "root favicon.ico" });
-
-  candidates.push(...providerCandidates(domain, options));
+  const candidates = await collectCandidates(target, domain, options);
   const seen = new Set<string>();
   for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
     if (seen.has(candidate.url)) continue;
@@ -53,8 +66,53 @@ export async function resolveBestIcon(targetUrl: string, options: ResolverOption
     if (blob) return { blob, source: candidate.source };
   }
   return options.fallback === "monogram"
-    ? { blob: createMonogram(domain), source: "generated monogram" }
+    ? { blob: createMonogram(domain, options.monogramStyle), source: "generated monogram" }
     : null;
+}
+
+export async function discoverIconCandidates(targetUrl: string, options: ResolverOptions): Promise<ResolvedIconCandidate[]> {
+  const target = new URL(targetUrl);
+  const domain = target.hostname.toLowerCase();
+  if (!isSafePublicTarget(target)) return [];
+  const candidates = await collectCandidates(target, domain, options);
+  const seenUrls = new Set<string>();
+  const seenContent = new Set<string>();
+  const results: ResolvedIconCandidate[] = [];
+  let attempts = 0;
+  for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
+    if (seenUrls.has(candidate.url)) continue;
+    seenUrls.add(candidate.url);
+    if (attempts++ >= MAX_CANDIDATE_ATTEMPTS) break;
+    const blob = await downloadAndValidate(candidate.url);
+    if (!blob) continue;
+    const fingerprint = await blobFingerprint(blob);
+    if (seenContent.has(fingerprint)) continue;
+    seenContent.add(fingerprint);
+    results.push({ blob, source: candidate.source, url: candidate.url });
+    if (results.length >= MAX_CANDIDATE_RESULTS) break;
+  }
+  return results;
+}
+
+export async function resolveIconUrl(iconUrl: string): Promise<ResolvedIcon | null> {
+  const url = new URL(iconUrl);
+  if (!isSafePublicTarget(url)) return null;
+  const blob = await downloadAndValidate(url.href);
+  return blob ? { blob, source: "custom URL" } : null;
+}
+
+async function collectCandidates(target: URL, domain: string, options: ResolverOptions) {
+  const candidates = await discoverPageIcons(target);
+  candidates.push({ url: new URL("/favicon.ico", target.origin).href, score: 10, source: "root favicon.ico" });
+  candidates.push(...providerCandidates(domain, options));
+  return candidates;
+}
+
+async function blobFingerprint(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let hash = 2166136261;
+  for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619);
+  return `${blob.type}:${blob.size}:${hash >>> 0}`;
 }
 
 async function discoverPageIcons(target: URL): Promise<Candidate[]> {
@@ -191,19 +249,44 @@ function providerName(preset: Exclude<ProviderPreset, "auto">) {
   return "custom favicon service";
 }
 
-function createMonogram(domain: string) {
-  const letter = (domain.replace(/^www\./, "").match(/[a-z0-9]/i)?.[0] ?? "?").toUpperCase();
+function createMonogram(domain: string, style?: MonogramStyle) {
+  const requestedLetter = style?.letter?.trim();
+  const letter = escapeXml((requestedLetter
+    ? Array.from(requestedLetter)[0]
+    : domain.replace(/^www\./, "").match(/[a-z0-9]/i)?.[0] ?? "?").toUpperCase());
   let hash = 0;
   for (const char of domain) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
   const hue = Math.abs(hash) % 360;
+  const customColors = style?.colorMode === "custom";
+  const primary = customColors ? safeColor(style?.primary, "#4F7CFF") : `hsl(${hue} 72% 58%)`;
+  const secondary = customColors ? safeColor(style?.secondary, "#745CFF") : `hsl(${(hue + 28) % 360} 68% 42%)`;
+  const text = safeColor(style?.text, "#FFFFFF");
+  const shape = style?.shape ?? "rounded";
+  const background = shape === "circle"
+    ? '<circle cx="32" cy="32" r="32" fill="url(#g)"/>'
+    : `<rect width="64" height="64" rx="${shape === "square" ? 4 : 14}" fill="url(#g)"/>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
     <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="hsl(${hue} 72% 58%)"/><stop offset="1" stop-color="hsl(${(hue + 28) % 360} 68% 42%)"/>
+      <stop stop-color="${primary}"/><stop offset="1" stop-color="${secondary}"/>
     </linearGradient></defs>
-    <rect width="64" height="64" rx="14" fill="url(#g)"/>
-    <text x="32" y="43" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="white">${letter}</text>
+    ${background}
+    <text x="32" y="43" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="${text}">${letter}</text>
   </svg>`;
   return new Blob([svg], { type: "image/svg+xml" });
+}
+
+function safeColor(value: string | undefined, fallback: string) {
+  return value && /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : fallback;
+}
+
+function escapeXml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&apos;",
+  })[character]!);
 }
 
 async function downloadAndValidate(url: string): Promise<Blob | null> {
