@@ -101,6 +101,13 @@
   max-width: 240px;
 }
 
+.auto-favicon-picker-scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--b3-theme-on-surface);
+}
+
 .auto-favicon-picker-status {
   flex: 0 0 auto;
 }

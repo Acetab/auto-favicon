@@ -20,6 +20,7 @@ type CacheEntry = {
   source?: string;
   targetUrl?: string;
   pinned?: boolean;
+  includeSubdomains?: boolean;
 };
 
 type LinkIconMode = "smart" | "auto";
@@ -50,6 +51,7 @@ const RUNTIME_STYLE_ID = "auto-favicon-runtime-style";
 const RESOLVER_VERSION = 4;
 const FAILURE_COOLDOWN = 10 * 60 * 1000;
 const MAX_CONCURRENT_FETCHES = 4;
+const COMMON_SECOND_LEVEL_DOMAINS = new Set(["ac", "co", "com", "edu", "gov", "net", "org"]);
 
 const defaultSettings: Settings = {
   enabled: true,
@@ -660,7 +662,7 @@ export default class AutoFaviconPlugin extends Plugin {
     let success = 0;
     let skipped = 0;
     await Promise.all(items.map(async ([domain, targetUrl]) => {
-      if (this.cache[domain]?.pinned) skipped += 1;
+      if (this.cachedIconForDomain(domain)?.entry.pinned) skipped += 1;
       else if (await this.fetchAndCache(domain, targetUrl, true)) success += 1;
       completed += 1;
       onProgress?.(completed, items.length);
@@ -749,7 +751,9 @@ export default class AutoFaviconPlugin extends Plugin {
           name.textContent = domain;
           const meta = document.createElement("span");
           const source = this.cacheSourceLabel(entry.source);
-          const status = entry.pinned ? this.t("cachePinned") : this.isCacheEntryFresh(entry) ? this.t("cacheFresh") : this.t("cacheExpired");
+          const status = entry.pinned
+            ? this.t(entry.includeSubdomains ? "cachePinnedSubdomains" : "cachePinned")
+            : this.isCacheEntryFresh(entry) ? this.t("cacheFresh") : this.t("cacheExpired");
           meta.textContent = `${source} · ${new Date(entry.fetchedAt).toLocaleString()} · ${status}`;
           info.append(name, meta);
           const rowActions = document.createElement("div");
@@ -798,14 +802,15 @@ export default class AutoFaviconPlugin extends Plugin {
     return source;
   }
 
-  private async pinDomainIcon(domain: string, targetUrl: string, blob: Blob, source: string) {
+  private async pinDomainIcon(domain: string, targetUrl: string, blob: Blob, source: string, includeSubdomains = false, selectedDomain = domain) {
     if (!await isDecodableImage(blob)) {
       showMessage(this.t("customIconInvalid"));
       return false;
     }
-    const pending = this.pendingFetches.get(domain);
+    const pending = this.pendingFetches.get(selectedDomain);
     if (pending) await pending;
     const previous = this.cache[domain];
+    const replaced = selectedDomain === domain ? undefined : this.cache[selectedDomain];
     let storedUrl: string | undefined;
     try {
       storedUrl = await this.storeIcon(domain, blob, `-custom-${Date.now()}`);
@@ -817,17 +822,23 @@ export default class AutoFaviconPlugin extends Plugin {
         source,
         targetUrl: this.sanitizeTargetUrl(targetUrl, domain),
         pinned: true,
+        includeSubdomains,
       };
+      if (selectedDomain !== domain) delete this.cache[selectedDomain];
       try {
         await this.saveCache();
       } catch (error) {
         if (previous) this.cache[domain] = previous;
         else delete this.cache[domain];
+        if (replaced) this.cache[selectedDomain] = replaced;
         throw error;
       }
       if (previous && previous.url !== storedUrl) await this.removeCachedFile(previous.url);
+      if (replaced && replaced.url !== storedUrl && replaced.url !== previous?.url) await this.removeCachedFile(replaced.url);
       this.failedDomains.delete(domain);
-      this.setRule(domain, storedUrl, source);
+      this.failedDomains.delete(selectedDomain);
+      await this.rebuildRules();
+      this.scheduleScan();
       this.updateCacheCount();
       showMessage(this.t("customIconSaved").replace("{domain}", domain));
       return true;
@@ -841,6 +852,7 @@ export default class AutoFaviconPlugin extends Plugin {
       }
       if (previous) this.cache[domain] = previous;
       else delete this.cache[domain];
+      if (replaced) this.cache[selectedDomain] = replaced;
       console.warn(`[auto-favicon] Unable to save custom icon for ${domain}`, error);
       showMessage(this.t("customIconSaveFailed"));
       return false;
@@ -852,10 +864,9 @@ export default class AutoFaviconPlugin extends Plugin {
     if (!entry?.pinned) return;
     await this.removeCachedFile(entry.url);
     delete this.cache[domain];
-    this.iconRules.delete(domain);
     this.failedDomains.delete(domain);
     await this.saveCache();
-    this.renderRules();
+    await this.rebuildRules();
     this.updateCacheCount();
     this.scheduleScan();
     showMessage(this.t("automaticRestored").replace("{domain}", domain));
@@ -872,6 +883,8 @@ export default class AutoFaviconPlugin extends Plugin {
     });
     const root = dialog.element.querySelector<HTMLElement>(".auto-favicon-picker");
     if (!root) return;
+
+    const sharedDomain = this.shareDomainFor(domain);
 
     const controls = document.createElement("div");
     controls.className = "auto-favicon-picker-controls";
@@ -897,18 +910,35 @@ export default class AutoFaviconPlugin extends Plugin {
       }));
     }
 
+    const shareInput = document.createElement("input");
+    shareInput.type = "checkbox";
+    shareInput.className = "b3-switch fn__flex-center";
+    const exactPinned = this.cache[domain]?.pinned;
+    shareInput.checked = Boolean(this.cache[domain]?.includeSubdomains
+      || (!exactPinned && sharedDomain && this.cache[sharedDomain]?.includeSubdomains));
+    const shareRow = document.createElement("label");
+    shareRow.className = "auto-favicon-picker-scope";
+    if (sharedDomain) {
+      const shareText = document.createElement("span");
+      shareText.textContent = this.t("applyToSubdomains").replace("{domain}", sharedDomain);
+      shareRow.append(shareInput, shareText);
+    }
+
     const status = document.createElement("div");
     status.className = "b3-label__text auto-favicon-picker-status";
     status.textContent = this.t("loadingCandidates");
     const grid = document.createElement("div");
     grid.className = "auto-favicon-candidate-grid";
-    root.append(controls, status, grid);
+    root.append(controls);
+    if (sharedDomain) root.append(shareRow);
+    root.append(status, grid);
 
     let saving = false;
     const saveAndClose = async (blob: Blob, source: string) => {
       if (saving) return;
       saving = true;
-      if (!await this.pinDomainIcon(domain, targetUrl, blob, source)) {
+      const cacheDomain = shareInput.checked && sharedDomain ? sharedDomain : domain;
+      if (!await this.pinDomainIcon(cacheDomain, targetUrl, blob, source, cacheDomain === sharedDomain && shareInput.checked, domain)) {
         saving = false;
         return;
       }
@@ -996,6 +1026,16 @@ export default class AutoFaviconPlugin extends Plugin {
     } catch {
       return null;
     }
+  }
+
+  private shareDomainFor(domain: string) {
+    if (domain.includes(":") || /^\d+(?:\.\d+){3}$/.test(domain)) return null;
+    const labels = domain.split(".");
+    if (labels.length < 2 || labels.some((label) => !label)) return null;
+    if (labels.length < 3) return domain;
+    const parent = labels.slice(1);
+    if (parent.length === 2 && parent[1].length === 2 && COMMON_SECOND_LEVEL_DOMAINS.has(parent[0])) return domain;
+    return parent.join(".");
   }
 
   private monogramSignature(settings: Settings) {
@@ -1086,10 +1126,11 @@ export default class AutoFaviconPlugin extends Plugin {
 
     let rulesChanged = false;
     domains.forEach(({ targetUrl }, domain) => {
-      const cached = this.cache[domain];
-      if (cached) {
+      const cachedMatch = this.cachedIconForDomain(domain);
+      if (cachedMatch) {
+        const { cacheDomain, entry: cached } = cachedMatch;
         if (!this.isCacheEntryFresh(cached)) {
-          void this.expireCachedDomain(domain, cached);
+          void this.expireCachedDomain(cacheDomain, cached);
           return;
         }
         const rule = this.createRule(domain, cached.url, cached.source);
@@ -1125,6 +1166,20 @@ export default class AutoFaviconPlugin extends Plugin {
     } catch {
       return null;
     }
+  }
+
+  private cachedIconForDomain(domain: string) {
+    const exact = this.cache[domain];
+    if (exact?.pinned) return { cacheDomain: domain, entry: exact };
+    let parent = this.shareDomainFor(domain);
+    while (parent && parent !== domain) {
+      const shared = this.cache[parent];
+      if (shared?.pinned && shared.includeSubdomains) return { cacheDomain: parent, entry: shared };
+      const next = this.shareDomainFor(parent);
+      if (next === parent) break;
+      parent = next;
+    }
+    return exact ? { cacheDomain: domain, entry: exact } : null;
   }
 
   private fetchAndCache(domain: string, targetUrl: string, preserveExisting = false) {

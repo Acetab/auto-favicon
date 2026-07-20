@@ -12,7 +12,7 @@ Auto Favicon automatically retrieves, displays, and locally caches website icons
 - Choose Standard Network, Proxy Network, or Direct Website Only.
 - Cache verified icons in the SiYuan workspace and reuse them without external requests.
 - Customize fallback monogram colors, letters, and shapes globally or per domain.
-- Upload a custom icon, use an image URL, or choose from discovered candidates for a domain.
+- Upload a custom icon, use an image URL, or choose from discovered candidates for a domain, with optional reuse across its subdomains.
 - Work alongside **Link Icon** while preserving its curated and custom icons.
 - Use the top-bar menu to change the display strategy, refresh the current document, manage cache, or open settings.
 
