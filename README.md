@@ -54,7 +54,7 @@ Localhost, `.local`, loopback, link-local, and private IP addresses are not sent
 
 ## Install and use
 
-Install from the SiYuan Marketplace when available, or extract `package.zip` into `workspace/data/plugins/auto-favicon/`. Enable the plugin, open its settings to choose a network and display strategy, then use the Auto Favicon button in the top toolbar for common actions.
+Search for **Auto Favicon** in the SiYuan Marketplace and install it, or extract `package.zip` into `workspace/data/plugins/auto-favicon/`. Enable the plugin, open its settings to choose a network and display strategy, then use the Auto Favicon button in the top toolbar for common actions.
 
 ## Credits and license
 
@@ -66,6 +66,7 @@ The idea of displaying icons before links and the original need for this plugin 
 - Added customizable local monograms and per-domain overrides.
 - Added a top-bar quick menu and detailed cache management.
 - Added per-domain custom uploads, image URLs, and selectable discovered icon candidates.
+- Added optional parent-domain icon reuse for changing service subdomains.
 - Clarified cache behavior, storage location, and user-facing descriptions.
 
 See [GitHub Releases](https://github.com/Acetab/auto-favicon/releases) for the complete version history.

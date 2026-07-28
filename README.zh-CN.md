@@ -54,7 +54,7 @@ Auto Favicon 自动为思源中的 HTTP/HTTPS 网页链接获取、显示并在�
 
 ## 安装与使用
 
-市场上架后可直接从思源集市安装；也可以把 `package.zip` 解压到 `工作空间/data/plugins/auto-favicon/`。启用插件，在设置中选择网络和显示策略，然后使用顶部工具栏的 Auto Favicon 按钮执行常用操作。
+可直接在思源集市搜索 **Auto Favicon** 并安装；也可以把 `package.zip` 解压到 `工作空间/data/plugins/auto-favicon/`。启用插件，在设置中选择网络和显示策略，然后使用顶部工具栏的 Auto Favicon 按钮执行常用操作。
 
 ## 致谢与许可
 
@@ -66,6 +66,7 @@ Auto Favicon 自动为思源中的 HTTP/HTTPS 网页链接获取、显示并在�
 - 增加可自定义的本地字母图标和按域名设置。
 - 增加顶部工具栏快捷菜单和详细缓存管理。
 - 增加按域名上传图片、使用图片 URL 和候选图标选择。
+- 增加可选的父域名图标复用，适配不断变化的服务子域名。
 - 明确缓存策略、保存位置和面向用户的描述。
 
 完整版本历史请查看 [GitHub Releases](https://github.com/Acetab/auto-favicon/releases)。
