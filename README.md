@@ -60,6 +60,11 @@ Search for **Auto Favicon** in the SiYuan Marketplace and install it, or extract
 
 The idea of displaying icons before links and the original need for this plugin were inspired by [Link Icon](https://github.com/chenshinshi/link-icon). Auto Favicon was built through **Vibe Coding** and is licensed under the [MIT License](LICENSE).
 
+### 0.5.2
+
+- Localized the top-bar title and enable/disable messages in Chinese.
+- Updated marketplace installation and automated release documentation.
+
 ### 0.5.1
 
 - Added Smart Fill compatibility with Link Icon.

@@ -94,12 +94,12 @@
   "refreshFinished": "重新获取完成：成功 {success} 个，失败 {failed} 个，跳过固定图标 {skipped} 个",
   "noRefreshableDomains": "当前只有固定的自定义图标，没有需要重新获取的域名",
   "cacheCleared": "自动图标缓存已清除，已固定的自定义图标保留",
-  "toolbarTitle": "Auto Favicon",
+  "toolbarTitle": "自动网站图标",
   "toolbarStatus": "当前：{mode} · 缓存 {count} 个域名",
   "toolbarEnabled": "启用网站图标",
   "toolbarMode": "显示策略",
   "openSettings": "打开插件设置",
-  "pluginEnabled": "Auto Favicon 已启用",
-  "pluginDisabled": "Auto Favicon 已停用",
+  "pluginEnabled": "自动网站图标已启用",
+  "pluginDisabled": "自动网站图标已停用",
   "modeChanged": "显示策略已切换为：{mode}"
 }

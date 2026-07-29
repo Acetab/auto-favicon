@@ -60,6 +60,11 @@ Auto Favicon 自动为思源中的 HTTP/HTTPS 网页链接获取、显示并在�
 
 本插件对链接前置图标的需求和展示思路受到[「链接图标」](https://github.com/chenshinshi/link-icon)启发，通过 **Vibe Coding** 完成，采用 [MIT License](LICENSE) 开源。
 
+### 0.5.2
+
+- 将中文环境中的顶栏标题和启停提示改为中文。
+- 更新思源集市安装说明和自动发布说明。
+
 ### 0.5.1
 
 - 增加与「链接图标」配合的“智能补充”。
