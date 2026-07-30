@@ -2,7 +2,7 @@
   "name": "auto-favicon",
   "author": "Acetab",
   "url": "https://github.com/Acetab/auto-favicon",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "minAppVersion": "3.7.0",
   "backends": ["all"],
   "frontends": ["desktop", "mobile"],
@@ -26,5 +26,5 @@
     "openCollective": "",
     "custom": []
   },
-  "keywords": ["网站图标", "favicon", "链接", "link icon", "website icon", "Vibe Coding"]
+  "keywords": ["网站图标", "自动图标", "网页链接", "外链", "favicon", "链接", "link icon", "website icon", "Vibe Coding"]
 }

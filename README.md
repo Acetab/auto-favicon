@@ -56,9 +56,21 @@ Localhost, `.local`, loopback, link-local, and private IP addresses are not sent
 
 Search for **Auto Favicon** in the SiYuan Marketplace and install it, or extract `package.zip` into `workspace/data/plugins/auto-favicon/`. Enable the plugin, open its settings to choose a network and display strategy, then use the Auto Favicon button in the top toolbar for common actions.
 
+## Feedback
+
+Users who cannot conveniently access GitHub can reply to the [Auto Favicon community post](https://ld246.com/article/1785052610863). GitHub users can also report problems through [GitHub Issues](https://github.com/Acetab/auto-favicon/issues).
+
+When reporting a problem, please include the Auto Favicon and SiYuan versions, operating system, affected public URL, network strategy, favicon provider and fallback setting, whether Link Icon is enabled, and any relevant `[auto-favicon] Unable to cache` console error. Remove private URLs, note content, tokens, and local paths before posting.
+
 ## Credits and license
 
 The idea of displaying icons before links and the original need for this plugin were inspired by [Link Icon](https://github.com/chenshinshi/link-icon). Auto Favicon was built through **Vibe Coding** and is licensed under the [MIT License](LICENSE).
+
+### 0.5.3
+
+- Added a community feedback entry for users who cannot conveniently access GitHub.
+- Enabled the custom service template only when Custom Service is selected.
+- Improved marketplace search keywords and updated build dependencies.
 
 ### 0.5.2
 

@@ -48,6 +48,7 @@ const CACHE_FILE = "favicon-cache.json";
 const PUBLIC_DIR = "/data/public/auto-favicon";
 const PUBLIC_URL = "/public/auto-favicon";
 const RUNTIME_STYLE_ID = "auto-favicon-runtime-style";
+const FEEDBACK_URL = "https://ld246.com/article/1785052610863";
 const RESOLVER_VERSION = 4;
 const FAILURE_COOLDOWN = 10 * 60 * 1000;
 const MAX_CONCURRENT_FETCHES = 4;
@@ -206,6 +207,11 @@ export default class AutoFaviconPlugin extends Plugin {
       ["custom", t("providerCustom")],
     ]);
     providerPreset.value = this.settings.providerPreset;
+    const updateProviderAvailability = () => {
+      provider.disabled = providerPreset.value !== "custom";
+    };
+    providerPreset.addEventListener("change", updateProviderAvailability);
+    updateProviderAvailability();
 
     const resolverMode = document.createElement("select");
     resolverMode.className = "b3-select fn__size200";
@@ -546,6 +552,12 @@ export default class AutoFaviconPlugin extends Plugin {
     menu.addItem({
       label: this.t("openSettings"),
       click: () => this.openSetting(),
+    });
+    menu.addItem({
+      label: this.t("feedback"),
+      click: () => {
+        window.open(FEEDBACK_URL, "_blank", "noopener,noreferrer");
+      },
     });
     const rect = (event.currentTarget as HTMLElement | null)?.getBoundingClientRect();
     menu.open({

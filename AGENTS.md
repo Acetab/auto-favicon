@@ -46,7 +46,8 @@ complete marketplace payload in `dist/`.
 
 ## Current status
 
-- As of 2026-07-29, v0.5.2 is the current release and is listed in the SiYuan Bazaar.
+- As of 2026-07-30, v0.5.3 is the current release, has passed real SiYuan
+  validation, and is listed in the SiYuan Bazaar.
 - The release package uses forward-slash ZIP entry paths.
 - A community report of a refresh ending with 0 successes and 2 failures is
   pending evidence. Before changing code, collect the SiYuan/plugin versions,

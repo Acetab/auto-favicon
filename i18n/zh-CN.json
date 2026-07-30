@@ -99,6 +99,7 @@
   "toolbarEnabled": "启用网站图标",
   "toolbarMode": "显示策略",
   "openSettings": "打开插件设置",
+  "feedback": "问题反馈",
   "pluginEnabled": "自动网站图标已启用",
   "pluginDisabled": "自动网站图标已停用",
   "modeChanged": "显示策略已切换为：{mode}"

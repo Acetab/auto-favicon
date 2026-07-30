@@ -99,6 +99,7 @@
   "toolbarEnabled": "Enable website icons",
   "toolbarMode": "Display strategy",
   "openSettings": "Open plugin settings",
+  "feedback": "Community feedback",
   "pluginEnabled": "Auto Favicon enabled",
   "pluginDisabled": "Auto Favicon disabled",
   "modeChanged": "Display strategy changed to: {mode}"

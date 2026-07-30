@@ -56,9 +56,21 @@ Auto Favicon 自动为思源中的 HTTP/HTTPS 网页链接获取、显示并在�
 
 可直接在思源集市搜索 **Auto Favicon** 并安装；也可以把 `package.zip` 解压到 `工作空间/data/plugins/auto-favicon/`。启用插件，在设置中选择网络和显示策略，然后使用顶部工具栏的 Auto Favicon 按钮执行常用操作。
 
+## 问题反馈
+
+不方便访问 GitHub 的用户，可以直接在 [Auto Favicon 社区帖子](https://ld246.com/article/1785052610863)下回复；能够访问 GitHub 的用户也可以通过 [GitHub Issues](https://github.com/Acetab/auto-favicon/issues)反馈。
+
+反馈时请尽量附上 Auto Favicon 和思源版本、操作系统、出问题的公开网址、网络策略、图标服务与兜底设置、是否启用了「链接图标」，以及相关的 `[auto-favicon] Unable to cache` 控制台错误。发布前请移除私人网址、笔记内容、令牌和本地路径。
+
 ## 致谢与许可
 
 本插件对链接前置图标的需求和展示思路受到[「链接图标」](https://github.com/chenshinshi/link-icon)启发，通过 **Vibe Coding** 完成，采用 [MIT License](LICENSE) 开源。
+
+### 0.5.3
+
+- 增加社区反馈入口，方便不便访问 GitHub 的用户反馈问题。
+- 仅在选择“自定义服务”时启用自定义服务模板。
+- 改进集市搜索关键词并更新构建依赖。
 
 ### 0.5.2
 
