@@ -54,6 +54,9 @@ complete marketplace payload in `dist/`.
 
 - As of 2026-07-31, v0.5.7 is the current release. It separates public NoCode
   deployments by route and probes common root SVG/PNG favicon files.
+- GitHub Actions run `30622377454` published v0.5.7 from `502640a`; the
+  12-entry online package has SHA-256
+  `4671E5CE60338E7579D8D8625A203DC1621500F1BBF50EA72EF5E31A28CBED51`.
 - GitHub Actions run `30605537368` published v0.5.6 from `9b91217`; the online
   package, README image references, and reviewed PNG hashes were verified.
 - v0.5.5 added the before/after preview, clearer custom-icon selection, and
