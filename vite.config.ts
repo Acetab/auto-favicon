@@ -13,7 +13,7 @@ export default defineConfig({
         { src: "THIRD_PARTY_NOTICES.md", dest: "." },
         { src: "icon.png", dest: "." },
         { src: "preview.png", dest: "." },
-        { src: "screenshot.png", dest: "." },
+        { src: "icon-picker.png", dest: "." },
       ],
     }),
   ],

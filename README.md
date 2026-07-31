@@ -4,7 +4,7 @@
 
 Auto Favicon automatically retrieves, displays, and locally caches website icons for HTTP/HTTPS links in SiYuan. When no usable favicon is available, it can generate a colorful domain monogram locally.
 
-![Auto Favicon in SiYuan](screenshot.png)
+![Auto Favicon before and after](preview.png)
 
 ## Features
 
@@ -34,6 +34,8 @@ Cache management supports refreshing the current document, refreshing every auto
 ## When an icon does not look right
 
 A website may publish several icons whose sharpness, padding, and borders vary by source. If an automatically retrieved icon is blurry, bordered, or otherwise unsuitable, open **Manage cache** from the top toolbar, find the domain, and select **Change icon**:
+
+![Choose an icon candidate for a domain](icon-picker.png)
 
 - Choose from the candidates discovered by the plugin; each card shows pixel dimensions, format, and file size.
 - Upload a local image.
