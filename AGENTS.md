@@ -39,6 +39,8 @@ complete marketplace payload in `dist/`.
 ## Release
 
 - Keep versions aligned in `package.json`, `package-lock.json`, and `plugin.json`.
+- Keep the recent-updates sections in both READMEs synchronized and limited to
+  the latest two releases; link to GitHub Releases for the complete history.
 - Commit and push the intended source state before tagging.
 - Push a `vX.Y.Z` tag; GitHub Actions validates, builds `package.zip`, and creates
   the GitHub Release automatically.
@@ -46,11 +48,9 @@ complete marketplace payload in `dist/`.
 
 ## Current status
 
-- As of 2026-07-30, v0.5.3 is the current release, has passed real SiYuan
-  validation, and is listed in the SiYuan Bazaar.
+- As of 2026-07-31, v0.5.4 fixes first-run caching in a clean workspace and has
+  passed real SiYuan validation.
 - The release package uses forward-slash ZIP entry paths.
-- A community report of a refresh ending with 0 successes and 2 failures is
-  pending evidence. Before changing code, collect the SiYuan/plugin versions,
-  resolver/provider/fallback settings, and the complete
-  `[auto-favicon] Unable to cache` console error.
+- Missing plugin data can load as an empty string. Normalize loaded settings and
+  cache values to plain objects before using them.
 - Before future delivery, rerun both validation commands above.

@@ -66,24 +66,18 @@ When reporting a problem, please include the Auto Favicon and SiYuan versions, o
 
 The idea of displaying icons before links and the original need for this plugin were inspired by [Link Icon](https://github.com/chenshinshi/link-icon). Auto Favicon was built through **Vibe Coding** and is licensed under the [MIT License](LICENSE).
 
+## Recent updates
+
+### 0.5.4
+
+- Fixed all favicon refreshes failing on the first run in a new workspace.
+- Safely handle plugin settings and cache data that have not been created yet or contain an invalid value.
+- Show the domain, failure stage, and specific reason when a manual refresh fails.
+
 ### 0.5.3
 
 - Added a community feedback entry for users who cannot conveniently access GitHub.
 - Enabled the custom service template only when Custom Service is selected.
 - Improved marketplace search keywords and updated build dependencies.
-
-### 0.5.2
-
-- Localized the top-bar title and enable/disable messages in Chinese.
-- Updated marketplace installation and automated release documentation.
-
-### 0.5.1
-
-- Added Smart Fill compatibility with Link Icon.
-- Added customizable local monograms and per-domain overrides.
-- Added a top-bar quick menu and detailed cache management.
-- Added per-domain custom uploads, image URLs, and selectable discovered icon candidates.
-- Added optional parent-domain icon reuse for changing service subdomains.
-- Clarified cache behavior, storage location, and user-facing descriptions.
 
 See [GitHub Releases](https://github.com/Acetab/auto-favicon/releases) for the complete version history.

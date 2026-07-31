@@ -89,18 +89,25 @@ export default class AutoFaviconPlugin extends Plugin {
   private activeFetches = 0;
   private fetchWaiters: Array<() => void> = [];
   private cacheSaveQueue: Promise<void> = Promise.resolve();
+  private failureReasons = new Map<string, string>();
   private readonly inputListener = () => this.scheduleScan();
 
   async onload() {
     this.addToolbar();
-    const saved = ((await this.loadData(SETTINGS_FILE)) ?? {}) as Partial<Settings> & { preferDynamic?: boolean };
+    const loadedSettings = await this.loadData(SETTINGS_FILE);
+    const saved = (loadedSettings && typeof loadedSettings === "object" && !Array.isArray(loadedSettings)
+      ? loadedSettings
+      : {}) as Partial<Settings> & { preferDynamic?: boolean };
     this.settings = {
       ...defaultSettings,
       ...saved,
       linkIconMode: saved.linkIconMode ?? (saved.preferDynamic ? "auto" : "smart"),
       monogramOverrides: { ...defaultSettings.monogramOverrides, ...(saved.monogramOverrides ?? {}) },
     };
-    this.cache = (await this.loadData(CACHE_FILE)) ?? {};
+    const loadedCache = await this.loadData(CACHE_FILE);
+    this.cache = loadedCache && typeof loadedCache === "object" && !Array.isArray(loadedCache)
+      ? loadedCache as Record<string, CacheEntry>
+      : {};
     await this.sanitizeCachedTargets();
     this.addSetting();
     await this.rebuildRules();
@@ -673,20 +680,27 @@ export default class AutoFaviconPlugin extends Plugin {
     let completed = 0;
     let success = 0;
     let skipped = 0;
+    const failures: string[] = [];
     await Promise.all(items.map(async ([domain, targetUrl]) => {
       if (this.cachedIconForDomain(domain)?.entry.pinned) skipped += 1;
       else if (await this.fetchAndCache(domain, targetUrl, true)) success += 1;
+      else {
+        const reason = this.failureReasons.get(domain);
+        if (reason && failures.length < 3) failures.push(reason);
+      }
       completed += 1;
       onProgress?.(completed, items.length);
     }));
-    return { success, failed: items.length - success - skipped, skipped };
+    return { success, failed: items.length - success - skipped, skipped, failures };
   }
 
-  private showRefreshResult(result: { success: number; failed: number; skipped: number }) {
-    showMessage(this.t("refreshFinished")
+  private showRefreshResult(result: { success: number; failed: number; skipped: number; failures?: string[] }) {
+    const summary = this.t("refreshFinished")
       .replace("{success}", String(result.success))
       .replace("{failed}", String(result.failed))
-      .replace("{skipped}", String(result.skipped)));
+      .replace("{skipped}", String(result.skipped));
+    const details = result.failures?.length ? `\n${result.failures.join("\n")}` : "";
+    showMessage(`${summary}${details}`);
   }
 
   private async removeCachedDomain(domain: string, save = true) {
@@ -1206,6 +1220,7 @@ export default class AutoFaviconPlugin extends Plugin {
   private async runFetchAndCache(domain: string, targetUrl: string, preserveExisting: boolean) {
     const previous = this.cache[domain];
     let storedUrl: string | undefined;
+    let stage = "resolve";
     this.pendingDomains.add(domain);
     await this.acquireFetchSlot();
     try {
@@ -1218,11 +1233,14 @@ export default class AutoFaviconPlugin extends Plugin {
       });
       if (!resolved) throw new Error("no usable icon source returned an image");
       const suffix = preserveExisting && previous ? `-refresh-${Date.now()}` : "";
+      stage = "write";
       const url = await this.storeIcon(domain, resolved.blob, suffix);
       storedUrl = url;
+      stage = "verify-write";
       if (!await this.isStoredIconUsable(url)) {
         throw new Error("cached icon could not be loaded back from SiYuan");
       }
+      stage = "update-cache";
       this.cache[domain] = {
         url,
         fetchedAt: Date.now(),
@@ -1230,6 +1248,7 @@ export default class AutoFaviconPlugin extends Plugin {
         source: resolved.source,
         targetUrl: this.sanitizeTargetUrl(targetUrl, domain),
       };
+      stage = "save-cache";
       try {
         await this.saveCache();
       } catch (error) {
@@ -1244,8 +1263,10 @@ export default class AutoFaviconPlugin extends Plugin {
           console.warn(`[auto-favicon] Unable to remove old cache for ${domain}`, error);
         }
       }
+      stage = "apply";
       this.updateCacheCount();
       this.failedDomains.delete(domain);
+      this.failureReasons.delete(domain);
       this.setRule(domain, url, resolved.source);
       return true;
     } catch (error) {
@@ -1260,6 +1281,7 @@ export default class AutoFaviconPlugin extends Plugin {
       else delete this.cache[domain];
       this.updateCacheCount();
       console.warn(`[auto-favicon] Unable to cache ${domain}`, error);
+      this.failureReasons.set(domain, `${domain} · ${stage} · ${this.errorText(error)}`);
       this.failedDomains.set(domain, Date.now());
       // Do not create a pseudo-element when no verified image exists. This
       // prevents an empty gap and lets link-icon keep its own valid icon.
@@ -1267,6 +1289,15 @@ export default class AutoFaviconPlugin extends Plugin {
     } finally {
       this.releaseFetchSlot();
       this.pendingDomains.delete(domain);
+    }
+  }
+
+  private errorText(error: unknown) {
+    if (error instanceof Error) return error.message;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
     }
   }
 

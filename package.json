@@ -1,6 +1,6 @@
 {
   "name": "siyuan-auto-favicon",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Automatically fetch and cache favicons for SiYuan web links, with local fallbacks and smart compatibility with Link Icon.",
   "private": false,
   "type": "module",
