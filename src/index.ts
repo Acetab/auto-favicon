@@ -3,6 +3,7 @@ import "./style.css";
 import {
   discoverIconCandidates,
   isDecodableImage,
+  parentDomainOf,
   resolveBestIcon,
   resolveIconUrl,
   type FallbackMode,
@@ -12,6 +13,7 @@ import {
   type ProviderPreset,
   type ResolverMode,
 } from "./icon-resolver";
+import { safePageDiscoveryUrl, scopeForUrl, scopeFromCacheKey, scopeMatchTarget, type LinkScope } from "./url-scope";
 
 type CacheEntry = {
   url: string;
@@ -19,15 +21,21 @@ type CacheEntry = {
   resolverVersion?: number;
   source?: string;
   targetUrl?: string;
+  domain?: string;
+  routeKey?: string;
+  pathPrefix?: string;
   pinned?: boolean;
   includeSubdomains?: boolean;
 };
 
 type LinkIconMode = "smart" | "auto";
+type FetchTrigger = "automatic" | "manual";
 type MonogramOverride = Omit<MonogramStyle, "colorMode"> & { letter: string };
 
 type Settings = {
   enabled: boolean;
+  pauseAutomaticFetch: boolean;
+  allowFullPageDiscovery: boolean;
   linkIconMode: LinkIconMode;
   provider: string;
   providerPreset: ProviderPreset;
@@ -49,13 +57,14 @@ const PUBLIC_DIR = "/data/public/auto-favicon";
 const PUBLIC_URL = "/public/auto-favicon";
 const RUNTIME_STYLE_ID = "auto-favicon-runtime-style";
 const FEEDBACK_URL = "https://ld246.com/article/1785052610863";
-const RESOLVER_VERSION = 4;
+const RESOLVER_VERSION = 5;
 const FAILURE_COOLDOWN = 10 * 60 * 1000;
 const MAX_CONCURRENT_FETCHES = 4;
-const COMMON_SECOND_LEVEL_DOMAINS = new Set(["ac", "co", "com", "edu", "gov", "net", "org"]);
 
 const defaultSettings: Settings = {
   enabled: true,
+  pauseAutomaticFetch: false,
+  allowFullPageDiscovery: false,
   linkIconMode: "smart",
   provider: "https://example.com/favicon/{domain}",
   providerPreset: "auto",
@@ -75,7 +84,11 @@ export default class AutoFaviconPlugin extends Plugin {
   private settings: Settings = { ...defaultSettings };
   private cache: Record<string, CacheEntry> = {};
   private pendingDomains = new Set<string>();
-  private pendingFetches = new Map<string, Promise<boolean>>();
+  private pendingFetches = new Map<string, {
+    promise: Promise<boolean>;
+    trigger: FetchTrigger;
+    automaticGeneration: number;
+  }>();
   private failedDomains = new Map<string, number>();
   private iconRules = new Map<string, string>();
   private forceDomains = new Set<string>();
@@ -90,6 +103,8 @@ export default class AutoFaviconPlugin extends Plugin {
   private fetchWaiters: Array<() => void> = [];
   private cacheSaveQueue: Promise<void> = Promise.resolve();
   private failureReasons = new Map<string, string>();
+  private automaticFetchGeneration = 0;
+  private cacheGeneration = 0;
   private readonly inputListener = () => this.scheduleScan();
 
   async onload() {
@@ -109,6 +124,7 @@ export default class AutoFaviconPlugin extends Plugin {
       ? loadedCache as Record<string, CacheEntry>
       : {};
     await this.sanitizeCachedTargets();
+    await this.migrateCacheEntries();
     this.addSetting();
     await this.rebuildRules();
     this.startObserver();
@@ -149,11 +165,28 @@ export default class AutoFaviconPlugin extends Plugin {
 
   private async sanitizeCachedTargets() {
     let changed = false;
-    for (const [domain, entry] of Object.entries(this.cache)) {
+    for (const [key, entry] of Object.entries(this.cache)) {
+      const domain = entry.domain ?? key.split("::")[0];
+      if (entry.domain !== domain) {
+        entry.domain = domain;
+        changed = true;
+      }
       if (!entry.targetUrl) continue;
       const sanitized = this.sanitizeTargetUrl(entry.targetUrl, domain);
       if (entry.targetUrl !== sanitized) {
         entry.targetUrl = sanitized;
+        changed = true;
+      }
+    }
+    if (changed) await this.saveCache();
+  }
+
+  private async migrateCacheEntries() {
+    let changed = false;
+    for (const entry of Object.values(this.cache)) {
+      if (entry.pinned || entry.resolverVersion === RESOLVER_VERSION) continue;
+      if (entry.source !== "generated monogram") {
+        entry.resolverVersion = RESOLVER_VERSION;
         changed = true;
       }
     }
@@ -189,6 +222,16 @@ export default class AutoFaviconPlugin extends Plugin {
     enabled.className = "b3-switch fn__flex-center";
     enabled.checked = this.settings.enabled;
     this.enabledInput = enabled;
+
+    const pauseAutomaticFetch = document.createElement("input");
+    pauseAutomaticFetch.type = "checkbox";
+    pauseAutomaticFetch.className = "b3-switch fn__flex-center";
+    pauseAutomaticFetch.checked = this.settings.pauseAutomaticFetch;
+
+    const allowFullPageDiscovery = document.createElement("input");
+    allowFullPageDiscovery.type = "checkbox";
+    allowFullPageDiscovery.className = "b3-switch fn__flex-center";
+    allowFullPageDiscovery.checked = this.settings.allowFullPageDiscovery;
 
     const linkIconMode = document.createElement("select");
     linkIconMode.className = "b3-select fn__size200";
@@ -405,7 +448,10 @@ export default class AutoFaviconPlugin extends Plugin {
     this.setting = new Setting({
       confirmCallback: async () => {
         const previousMonogramSignature = this.monogramSignature(this.settings);
+        const wasPaused = this.settings.pauseAutomaticFetch;
         this.settings.enabled = enabled.checked;
+        this.settings.pauseAutomaticFetch = pauseAutomaticFetch.checked;
+        this.settings.allowFullPageDiscovery = allowFullPageDiscovery.checked;
         this.settings.linkIconMode = linkIconMode.value as LinkIconMode;
         this.settings.provider = provider.value.trim() || defaultSettings.provider;
         this.settings.providerPreset = providerPreset.value as ProviderPreset;
@@ -422,15 +468,26 @@ export default class AutoFaviconPlugin extends Plugin {
         if (previousMonogramSignature !== this.monogramSignature(this.settings)) {
           await this.invalidateGeneratedMonograms();
         }
+        if (!wasPaused && this.settings.pauseAutomaticFetch) this.automaticFetchGeneration += 1;
         await this.saveData(SETTINGS_FILE, this.settings);
         await this.rebuildRules();
-        this.scheduleScan();
+        if (this.settings.enabled && !this.settings.pauseAutomaticFetch) this.scheduleScan();
       },
     });
     this.setting.addItem({
       title: t("enableTitle"),
       description: t("enableDescription"),
       createActionElement: () => enabled,
+    });
+    this.setting.addItem({
+      title: t("pauseAutomaticFetchTitle"),
+      description: t("pauseAutomaticFetchDescription"),
+      createActionElement: () => pauseAutomaticFetch,
+    });
+    this.setting.addItem({
+      title: t("allowFullPageDiscoveryTitle"),
+      description: t("allowFullPageDiscoveryDescription"),
+      createActionElement: () => allowFullPageDiscovery,
     });
     this.setting.addItem({
       title: t("strategyTitle"),
@@ -522,9 +579,13 @@ export default class AutoFaviconPlugin extends Plugin {
     const menu = new Menu("auto-favicon-toolbar-menu");
     menu.addItem({
       type: "readonly",
-      label: this.t("toolbarStatus")
+      label: `${this.t("toolbarStatus")
         .replace("{mode}", this.t(this.settings.linkIconMode === "smart" ? "linkIconSmart" : "linkIconAuto"))
-        .replace("{count}", String(Object.keys(this.cache).length)),
+        .replace("{count}", String(Object.keys(this.cache).length))}${
+        this.settings.pauseAutomaticFetch ? ` · ${this.t("automaticFetchPausedStatus")}` : ""
+      }${
+        this.settings.allowFullPageDiscovery ? ` · ${this.t("fullPageDiscoveryEnabledStatus")}` : ""
+      }`,
     });
     menu.addItem({
       label: this.t("toolbarEnabled"),
@@ -594,7 +655,7 @@ export default class AutoFaviconPlugin extends Plugin {
     if (this.enabledInput) this.enabledInput.checked = enabled;
     await this.saveData(SETTINGS_FILE, this.settings);
     await this.rebuildRules();
-    if (enabled) this.scheduleScan();
+    if (enabled && !this.settings.pauseAutomaticFetch) this.scheduleScan();
     showMessage(this.t(enabled ? "pluginEnabled" : "pluginDisabled"));
   }
 
@@ -639,15 +700,15 @@ export default class AutoFaviconPlugin extends Plugin {
       ".protyle-wysiwyg a[href]",
       ".b3-typography a[href]",
     ].join(",");
-    const domains = new Map<string, { targetUrl: string; elements: HTMLElement[] }>();
+    const domains = new Map<string, { scope: LinkScope; targetUrl: string; elements: HTMLElement[] }>();
     document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
       if (root && element !== root && !root.contains(element)) return;
       const href = element.dataset.href ?? element.getAttribute("href") ?? "";
-      const domain = this.domainOf(href);
-      if (!domain) return;
-      const existing = domains.get(domain);
+      const scope = scopeForUrl(href);
+      if (!scope) return;
+      const existing = domains.get(scope.key);
       if (existing) existing.elements.push(element);
-      else domains.set(domain, { targetUrl: href, elements: [element] });
+      else domains.set(scope.key, { scope, targetUrl: href, elements: [element] });
     });
     return domains;
   }
@@ -658,7 +719,7 @@ export default class AutoFaviconPlugin extends Plugin {
       showMessage(this.t("noCurrentDomains"));
       return;
     }
-    const targets = new Map([...domains].map(([domain, item]) => [domain, item.targetUrl]));
+    const targets = new Map([...domains].map(([key, item]) => [key, { scope: item.scope, targetUrl: item.targetUrl }]));
     showMessage(this.t("refreshStarted").replace("{count}", String(targets.size)));
     this.showRefreshResult(await this.refreshDomains(targets));
   }
@@ -666,7 +727,11 @@ export default class AutoFaviconPlugin extends Plugin {
   private async refreshAllCachedDomains() {
     const targets = new Map(Object.entries(this.cache)
       .filter(([, entry]) => !entry.pinned)
-      .map(([domain, entry]) => [domain, entry.targetUrl ?? `https://${domain}/`]));
+      .map(([key, entry]) => {
+        const scope = scopeFromCacheKey(key, entry.domain, entry.pathPrefix);
+        const targetUrl = entry.targetUrl ?? `https://${scope.domain}${scope.pathPrefix ?? "/"}`;
+        return [key, { scope, targetUrl }] as const;
+      }));
     if (targets.size === 0) {
       showMessage(this.t(Object.keys(this.cache).length === 0 ? "cacheEmpty" : "noRefreshableDomains"));
       return;
@@ -675,17 +740,20 @@ export default class AutoFaviconPlugin extends Plugin {
     this.showRefreshResult(await this.refreshDomains(targets));
   }
 
-  private async refreshDomains(targets: Map<string, string>, onProgress?: (completed: number, total: number) => void) {
+  private async refreshDomains(
+    targets: Map<string, { scope: LinkScope; targetUrl: string }>,
+    onProgress?: (completed: number, total: number) => void,
+  ) {
     const items = [...targets];
     let completed = 0;
     let success = 0;
     let skipped = 0;
     const failures: string[] = [];
-    await Promise.all(items.map(async ([domain, targetUrl]) => {
-      if (this.cachedIconForDomain(domain)?.entry.pinned) skipped += 1;
-      else if (await this.fetchAndCache(domain, targetUrl, true)) success += 1;
+    await Promise.all(items.map(async ([key, { scope, targetUrl }]) => {
+      if (this.cachedIconForScope(scope)?.entry.pinned) skipped += 1;
+      else if (await this.fetchAndCache(scope, targetUrl, true, "manual")) success += 1;
       else {
-        const reason = this.failureReasons.get(domain);
+        const reason = this.failureReasons.get(key);
         if (reason && failures.length < 3) failures.push(reason);
       }
       completed += 1;
@@ -703,16 +771,17 @@ export default class AutoFaviconPlugin extends Plugin {
     showMessage(`${summary}${details}`);
   }
 
-  private async removeCachedDomain(domain: string, save = true) {
-    const entry = this.cache[domain];
+  private async removeCachedDomain(key: string, save = true) {
+    const entry = this.cache[key];
     if (entry) await this.removeCachedFile(entry.url);
-    delete this.cache[domain];
-    this.failedDomains.delete(domain);
-    this.iconRules.delete(domain);
-    this.forceDomains.delete(domain);
+    delete this.cache[key];
+    this.failedDomains.delete(key);
+    this.iconRules.delete(key);
+    this.forceDomains.delete(key);
     if (save) await this.saveCache();
     this.renderRules();
     this.updateCacheCount();
+    if (!this.settings.pauseAutomaticFetch) this.scheduleScan();
   }
 
   private openCacheManager() {
@@ -759,7 +828,7 @@ export default class AutoFaviconPlugin extends Plugin {
         list.replaceChildren();
         const query = search.value.trim().toLowerCase();
         const entries = Object.entries(this.cache)
-          .filter(([domain]) => !query || domain.includes(query))
+          .filter(([key, entry]) => !query || key.includes(query) || entry.domain?.includes(query))
           .sort(([a], [b]) => a.localeCompare(b));
         if (entries.length === 0) {
           const empty = document.createElement("div");
@@ -768,13 +837,24 @@ export default class AutoFaviconPlugin extends Plugin {
           list.append(empty);
           return;
         }
-        for (const [domain, entry] of entries) {
+        let previousDomain = "";
+        for (const [key, entry] of entries) {
+          const scope = scopeFromCacheKey(key, entry.domain, entry.pathPrefix);
+          if (scope.domain !== previousDomain) {
+            const heading = document.createElement("strong");
+            heading.className = "auto-favicon-cache-domain-heading";
+            heading.textContent = scope.domain;
+            list.append(heading);
+            previousDomain = scope.domain;
+          }
           const row = document.createElement("div");
           row.className = "auto-favicon-cache-row";
           const info = document.createElement("div");
           info.className = "auto-favicon-cache-info";
           const name = document.createElement("strong");
-          name.textContent = domain;
+          name.textContent = scope.routeKey
+            ? this.t("cacheRouteName").replace("{type}", this.scopeTypeLabel(scope))
+            : this.t("cacheDomainDefault");
           const meta = document.createElement("span");
           const source = this.cacheSourceLabel(entry.source);
           const status = entry.pinned
@@ -785,24 +865,25 @@ export default class AutoFaviconPlugin extends Plugin {
           const rowActions = document.createElement("div");
           rowActions.className = "fn__flex auto-favicon-cache-row-actions";
           rowActions.append(this.actionButton(this.t("chooseIcon"), "b3-button b3-button--text", () => {
-            const currentTarget = this.collectDocumentDomains().get(domain)?.targetUrl;
-            this.openIconPicker(domain, currentTarget ?? entry.targetUrl ?? `https://${domain}/`, render);
+            const current = this.collectDocumentDomains(this.currentDocumentRoot()).get(scope.key);
+            this.openIconPicker(scope, current?.targetUrl ?? entry.targetUrl ?? `https://${scope.domain}${scope.pathPrefix ?? "/"}`, render);
           }));
           if (entry.pinned) {
             rowActions.append(this.actionButton(this.t("restoreAutomatic"), "b3-button b3-button--text", () => {
-              void this.restoreAutomaticIcon(domain).then(render);
+              void this.restoreAutomaticIcon(key).then(render);
             }));
           } else {
             rowActions.append(
               this.actionButton(this.t("refreshOne"), "b3-button b3-button--text", () => {
-              const target = entry.targetUrl ?? `https://${domain}/`;
-              void this.refreshDomains(new Map([[domain, target]])).then((result) => {
+              const current = this.collectDocumentDomains(this.currentDocumentRoot()).get(scope.key);
+              const targetUrl = current?.targetUrl ?? entry.targetUrl ?? `https://${scope.domain}${scope.pathPrefix ?? "/"}`;
+              void this.refreshDomains(new Map([[scope.key, { scope, targetUrl }]])).then((result) => {
                 this.showRefreshResult(result);
                 render();
               });
               }),
               this.actionButton(this.t("deleteOne"), "b3-button b3-button--text", () => {
-                void this.removeCachedDomain(domain).then(render);
+                void this.removeCachedDomain(key).then(render);
               }),
             );
           }
@@ -823,50 +904,74 @@ export default class AutoFaviconPlugin extends Plugin {
     if (source === "custom upload") return this.t("customUploadSource");
     if (source === "custom URL") return this.t("customUrlSource");
     if (source.startsWith("selected candidate:")) {
-      return `${this.t("selectedCandidateSource")} · ${source.slice("selected candidate:".length)}`;
+      return `${this.t("selectedCandidateSource")} · ${this.resolverSourceLabel(source.slice("selected candidate:".length))}`;
     }
+    return this.resolverSourceLabel(source);
+  }
+
+  private resolverSourceLabel(source: string) {
+    const parent = source.match(/^parent domain ([^·]+) · (.+)$/);
+    if (parent) return `${this.t("parentDomainSource").replace("{domain}", parent[1].trim())} · ${parent[2]}`;
+    const platform = source.match(/^platform type ([^:]+):(.+)$/);
+    if (platform) return this.t("platformTypeSource").replace("{type}", this.scopeTypeLabel({ routeKey: platform[2] }));
     return source;
   }
 
-  private async pinDomainIcon(domain: string, targetUrl: string, blob: Blob, source: string, includeSubdomains = false, selectedDomain = domain) {
+  private scopeTypeLabel(scope: Pick<LinkScope, "routeKey">) {
+    const key = `scopeType_${scope.routeKey ?? "domain"}`;
+    const translated = this.t(key);
+    return translated === key ? (scope.routeKey ?? this.t("cacheDomainDefault")) : translated;
+  }
+
+  private async pinScopedIcon(
+    scope: LinkScope,
+    selectedScope: LinkScope,
+    targetUrl: string,
+    blob: Blob,
+    source: string,
+    includeSubdomains = false,
+  ) {
     if (!await isDecodableImage(blob)) {
       showMessage(this.t("customIconInvalid"));
       return false;
     }
-    const pending = this.pendingFetches.get(selectedDomain);
-    if (pending) await pending;
-    const previous = this.cache[domain];
-    const replaced = selectedDomain === domain ? undefined : this.cache[selectedDomain];
+    const pending = this.pendingFetches.get(selectedScope.key);
+    if (pending) await pending.promise;
+    const previous = this.cache[scope.key];
+    const replaced = selectedScope.key === scope.key ? undefined : this.cache[selectedScope.key];
     let storedUrl: string | undefined;
     try {
-      storedUrl = await this.storeIcon(domain, blob, `-custom-${Date.now()}`);
+      storedUrl = await this.storeIcon(scope.key, blob, `-custom-${Date.now()}`);
       if (!await this.isStoredIconUsable(storedUrl)) throw new Error("custom icon could not be loaded back from SiYuan");
-      this.cache[domain] = {
+      this.cache[scope.key] = {
         url: storedUrl,
         fetchedAt: Date.now(),
         resolverVersion: RESOLVER_VERSION,
         source,
-        targetUrl: this.sanitizeTargetUrl(targetUrl, domain),
+        targetUrl: this.sanitizeTargetUrl(targetUrl, scope.domain),
+        domain: scope.domain,
+        routeKey: scope.routeKey,
+        pathPrefix: scope.pathPrefix,
         pinned: true,
         includeSubdomains,
       };
-      if (selectedDomain !== domain) delete this.cache[selectedDomain];
+      if (selectedScope.key !== scope.key) delete this.cache[selectedScope.key];
       try {
         await this.saveCache();
       } catch (error) {
-        if (previous) this.cache[domain] = previous;
-        else delete this.cache[domain];
-        if (replaced) this.cache[selectedDomain] = replaced;
+        if (previous) this.cache[scope.key] = previous;
+        else delete this.cache[scope.key];
+        if (replaced) this.cache[selectedScope.key] = replaced;
         throw error;
       }
       if (previous && previous.url !== storedUrl) await this.removeCachedFile(previous.url);
       if (replaced && replaced.url !== storedUrl && replaced.url !== previous?.url) await this.removeCachedFile(replaced.url);
-      this.failedDomains.delete(domain);
-      this.failedDomains.delete(selectedDomain);
+      this.failedDomains.delete(scope.key);
+      this.failedDomains.delete(selectedScope.key);
       await this.rebuildRules();
-      this.scheduleScan();
+      if (!this.settings.pauseAutomaticFetch) this.scheduleScan();
       this.updateCacheCount();
-      showMessage(this.t("customIconSaved").replace("{domain}", domain));
+      showMessage(this.t("customIconSaved").replace("{domain}", scope.domain));
       return true;
     } catch (error) {
       if (storedUrl && storedUrl !== previous?.url) {
@@ -876,29 +981,30 @@ export default class AutoFaviconPlugin extends Plugin {
           // Keep the original error as the useful diagnostic.
         }
       }
-      if (previous) this.cache[domain] = previous;
-      else delete this.cache[domain];
-      if (replaced) this.cache[selectedDomain] = replaced;
-      console.warn(`[auto-favicon] Unable to save custom icon for ${domain}`, error);
+      if (previous) this.cache[scope.key] = previous;
+      else delete this.cache[scope.key];
+      if (replaced) this.cache[selectedScope.key] = replaced;
+      console.warn(`[auto-favicon] Unable to save custom icon for ${scope.key}`, error);
       showMessage(this.t("customIconSaveFailed"));
       return false;
     }
   }
 
-  private async restoreAutomaticIcon(domain: string) {
-    const entry = this.cache[domain];
+  private async restoreAutomaticIcon(key: string) {
+    const entry = this.cache[key];
     if (!entry?.pinned) return;
     await this.removeCachedFile(entry.url);
-    delete this.cache[domain];
-    this.failedDomains.delete(domain);
+    delete this.cache[key];
+    this.failedDomains.delete(key);
     await this.saveCache();
     await this.rebuildRules();
     this.updateCacheCount();
-    this.scheduleScan();
-    showMessage(this.t("automaticRestored").replace("{domain}", domain));
+    if (!this.settings.pauseAutomaticFetch) this.scheduleScan();
+    showMessage(this.t("automaticRestored").replace("{domain}", entry.domain ?? key.split("::")[0]));
   }
 
-  private openIconPicker(domain: string, targetUrl: string, afterChange: () => void) {
+  private openIconPicker(selectedScope: LinkScope, targetUrl: string, afterChange: () => void) {
+    const domain = selectedScope.domain;
     const objectUrls: string[] = [];
     const dialog = new Dialog({
       title: this.t("chooseIconFor").replace("{domain}", domain),
@@ -927,28 +1033,29 @@ export default class AutoFaviconPlugin extends Plugin {
       void useUrl();
     });
     controls.append(fileInput, urlInput, urlButton);
-    if (this.cache[domain]?.pinned) {
+    if (this.cache[selectedScope.key]?.pinned) {
       controls.append(this.actionButton(this.t("restoreAutomatic"), "b3-button b3-button--text", () => {
-        void this.restoreAutomaticIcon(domain).then(() => {
+        void this.restoreAutomaticIcon(selectedScope.key).then(() => {
           dialog.destroy();
           afterChange();
         });
       }));
     }
 
-    const shareInput = document.createElement("input");
-    shareInput.type = "checkbox";
-    shareInput.className = "b3-switch fn__flex-center";
-    const exactPinned = this.cache[domain]?.pinned;
-    shareInput.checked = Boolean(this.cache[domain]?.includeSubdomains
-      || (!exactPinned && sharedDomain && this.cache[sharedDomain]?.includeSubdomains));
+    const scopeSelect = document.createElement("select");
+    scopeSelect.className = "b3-select";
+    if (selectedScope.routeKey) {
+      scopeSelect.add(new Option(this.t("pinCurrentType").replace("{type}", this.scopeTypeLabel(selectedScope)), "type"));
+    }
+    scopeSelect.add(new Option(this.t("pinCurrentDomain").replace("{domain}", domain), "domain"));
+    if (sharedDomain && sharedDomain !== domain) {
+      scopeSelect.add(new Option(this.t("applyToSubdomains").replace("{domain}", sharedDomain), "subdomains"));
+    }
     const shareRow = document.createElement("label");
     shareRow.className = "auto-favicon-picker-scope";
-    if (sharedDomain) {
-      const shareText = document.createElement("span");
-      shareText.textContent = this.t("applyToSubdomains").replace("{domain}", sharedDomain);
-      shareRow.append(shareInput, shareText);
-    }
+    const shareText = document.createElement("span");
+    shareText.textContent = this.t("pinScopeTitle");
+    shareRow.append(shareText, scopeSelect);
 
     const status = document.createElement("div");
     status.className = "b3-label__text auto-favicon-picker-status";
@@ -958,16 +1065,28 @@ export default class AutoFaviconPlugin extends Plugin {
     hint.textContent = this.t("candidateHint");
     const grid = document.createElement("div");
     grid.className = "auto-favicon-candidate-grid";
+    const loadPageCandidates = this.actionButton(
+      this.t("loadPageCandidates"),
+      "b3-button b3-button--outline",
+      () => void loadCandidates(true),
+    );
     root.append(controls);
-    if (sharedDomain) root.append(shareRow);
+    root.append(shareRow);
+    if (!this.settings.allowFullPageDiscovery) root.append(loadPageCandidates);
     root.append(hint, status, grid);
 
     let saving = false;
     const saveAndClose = async (blob: Blob, source: string) => {
       if (saving) return;
       saving = true;
-      const cacheDomain = shareInput.checked && sharedDomain ? sharedDomain : domain;
-      if (!await this.pinDomainIcon(cacheDomain, targetUrl, blob, source, cacheDomain === sharedDomain && shareInput.checked, domain)) {
+      const selection = scopeSelect.value;
+      const targetScope = selection === "type"
+        ? selectedScope
+        : selection === "subdomains" && sharedDomain
+          ? { key: sharedDomain, domain: sharedDomain }
+          : { key: domain, domain };
+      const includeSubdomains = selection === "subdomains";
+      if (!await this.pinScopedIcon(targetScope, selectedScope, targetUrl, blob, source, includeSubdomains)) {
         saving = false;
         return;
       }
@@ -1002,15 +1121,23 @@ export default class AutoFaviconPlugin extends Plugin {
       }
     };
 
-    void (async () => {
+    const loadCandidates = async (allowFullPageDiscovery: boolean) => {
+      loadPageCandidates.setAttribute("disabled", "true");
+      status.textContent = this.t("loadingCandidates");
+      grid.replaceChildren();
       await this.acquireFetchSlot();
       try {
-        const candidates = await discoverIconCandidates(targetUrl, {
+        const discoveryTarget = allowFullPageDiscovery
+          ? safePageDiscoveryUrl(targetUrl)
+          : `https://${selectedScope.domain}/`;
+        const candidates = await discoverIconCandidates(discoveryTarget, {
           provider: this.settings.provider,
           providerPreset: this.settings.providerPreset,
           mode: this.settings.resolverMode,
           fallback: this.settings.fallbackMode,
           monogramStyle: this.monogramStyleFor(domain),
+          scope: selectedScope,
+          allowFullPageDiscovery,
         });
         if (!root.isConnected) return;
         if (!urlButton.hasAttribute("disabled")) {
@@ -1027,7 +1154,7 @@ export default class AutoFaviconPlugin extends Plugin {
           preview.alt = candidate.source;
           const label = document.createElement("span");
           label.className = "auto-favicon-candidate-source";
-          label.textContent = candidate.source;
+          label.textContent = this.resolverSourceLabel(candidate.source);
           const details = document.createElement("small");
           details.className = "auto-favicon-candidate-details";
           const format = this.iconFormat(candidate.blob);
@@ -1047,12 +1174,14 @@ export default class AutoFaviconPlugin extends Plugin {
           grid.append(card);
         }
       } catch (error) {
-        console.warn(`[auto-favicon] Unable to discover candidates for ${domain}`, error);
+        console.warn(`[auto-favicon] Unable to discover candidates for ${selectedScope.key}`, error);
         if (root.isConnected && !urlButton.hasAttribute("disabled")) status.textContent = this.t("candidateLoadFailed");
       } finally {
         this.releaseFetchSlot();
+        loadPageCandidates.removeAttribute("disabled");
       }
-    })();
+    };
+    void loadCandidates(this.settings.allowFullPageDiscovery);
   }
 
   private iconFormat(blob: Blob) {
@@ -1094,10 +1223,7 @@ export default class AutoFaviconPlugin extends Plugin {
     if (domain.includes(":") || /^\d+(?:\.\d+){3}$/.test(domain)) return null;
     const labels = domain.split(".");
     if (labels.length < 2 || labels.some((label) => !label)) return null;
-    if (labels.length < 3) return domain;
-    const parent = labels.slice(1);
-    if (parent.length === 2 && parent[1].length === 2 && COMMON_SECOND_LEVEL_DOMAINS.has(parent[0])) return domain;
-    return parent.join(".");
+    return parentDomainOf(domain) ?? domain;
   }
 
   private monogramSignature(settings: Settings) {
@@ -1125,6 +1251,7 @@ export default class AutoFaviconPlugin extends Plugin {
   }
 
   private async clearCache() {
+    this.cacheGeneration += 1;
     const pinned = Object.fromEntries(Object.entries(this.cache).filter(([, entry]) => entry.pinned));
     const removable = Object.values(this.cache).filter((entry) => !entry.pinned);
     await Promise.all(removable.map(({ url }) => this.removeCachedFile(url)));
@@ -1134,6 +1261,7 @@ export default class AutoFaviconPlugin extends Plugin {
     this.forceDomains.clear();
     await this.saveCache();
     await this.rebuildRules();
+    if (!this.settings.pauseAutomaticFetch) this.scheduleScan();
   }
 
   private startObserver() {
@@ -1178,33 +1306,34 @@ export default class AutoFaviconPlugin extends Plugin {
     const previousRules = runtimeStyle?.textContent ?? "";
     if (runtimeStyle) runtimeStyle.textContent = "";
     try {
-      domains.forEach(({ elements }, domain) => {
-        if (this.externalIconState(elements) === "meaningful") this.forceDomains.delete(domain);
-        else this.forceDomains.add(domain);
+      domains.forEach(({ elements }, key) => {
+        if (this.externalIconState(elements) === "meaningful") this.forceDomains.delete(key);
+        else this.forceDomains.add(key);
       });
     } finally {
       if (runtimeStyle) runtimeStyle.textContent = previousRules;
     }
 
     let rulesChanged = false;
-    domains.forEach(({ targetUrl }, domain) => {
-      const cachedMatch = this.cachedIconForDomain(domain);
+    domains.forEach(({ scope, targetUrl }, key) => {
+      const cachedMatch = this.cachedIconForScope(scope);
       if (cachedMatch) {
-        const { cacheDomain, entry: cached } = cachedMatch;
-        if (!this.isCacheEntryFresh(cached)) {
-          void this.expireCachedDomain(cacheDomain, cached);
+        const { cacheKey, entry: cached } = cachedMatch;
+        if (!this.settings.pauseAutomaticFetch && !this.isCacheEntryFresh(cached)) {
+          void this.expireCachedDomain(cacheKey, cached);
           return;
         }
-        const rule = this.createRule(domain, cached.url, cached.source);
-        if (this.iconRules.get(domain) !== rule) {
-          this.iconRules.set(domain, rule);
+        const rule = this.createRule(scope, cached.url, cached.source);
+        if (this.iconRules.get(key) !== rule) {
+          this.iconRules.set(key, rule);
           rulesChanged = true;
         }
-        return;
+        if (cacheKey === key || cached.pinned || this.settings.pauseAutomaticFetch) return;
       }
-      const failedAt = this.failedDomains.get(domain);
+      if (this.settings.pauseAutomaticFetch) return;
+      const failedAt = this.failedDomains.get(key);
       if (failedAt && Date.now() - failedAt < FAILURE_COOLDOWN) return;
-      void this.fetchAndCache(domain, targetUrl);
+      void this.fetchAndCache(scope, targetUrl);
     });
     if (rulesChanged) this.renderRules();
   }
@@ -1220,90 +1349,144 @@ export default class AutoFaviconPlugin extends Plugin {
     return placeholder ? "placeholder" : "none";
   }
 
-  private domainOf(href: string): string | null {
-    try {
-      const url = new URL(href);
-      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-      return url.hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-
-  private cachedIconForDomain(domain: string) {
-    const exact = this.cache[domain];
-    if (exact?.pinned) return { cacheDomain: domain, entry: exact };
-    let parent = this.shareDomainFor(domain);
-    while (parent && parent !== domain) {
+  private cachedIconForScope(scope: LinkScope) {
+    const exact = this.cache[scope.key];
+    if (exact?.pinned) return { cacheKey: scope.key, entry: exact };
+    const domainPinned = scope.routeKey ? this.cache[scope.domain] : undefined;
+    if (domainPinned?.pinned) return { cacheKey: scope.domain, entry: domainPinned };
+    let parent = this.shareDomainFor(scope.domain);
+    while (parent && parent !== scope.domain) {
       const shared = this.cache[parent];
-      if (shared?.pinned && shared.includeSubdomains) return { cacheDomain: parent, entry: shared };
+      if (shared?.pinned && shared.includeSubdomains) return { cacheKey: parent, entry: shared };
       const next = this.shareDomainFor(parent);
       if (next === parent) break;
       parent = next;
     }
-    return exact ? { cacheDomain: domain, entry: exact } : null;
+    if (exact) return { cacheKey: scope.key, entry: exact };
+    const domainFallback = scope.routeKey ? this.cache[scope.domain] : undefined;
+    return domainFallback ? { cacheKey: scope.domain, entry: domainFallback } : null;
   }
 
-  private fetchAndCache(domain: string, targetUrl: string, preserveExisting = false) {
-    const pending = this.pendingFetches.get(domain);
-    if (pending) return pending;
-    const request = this.runFetchAndCache(domain, targetUrl, preserveExisting);
-    this.pendingFetches.set(domain, request);
-    void request.finally(() => this.pendingFetches.delete(domain));
+  private fetchAndCache(
+    scope: LinkScope,
+    targetUrl: string,
+    preserveExisting = false,
+    trigger: FetchTrigger = "automatic",
+  ): Promise<boolean> {
+    if (trigger === "automatic" && this.settings.pauseAutomaticFetch) return Promise.resolve(false);
+    const pending = this.pendingFetches.get(scope.key);
+    if (pending) {
+      const supersedesInvalidatedAutomatic = pending.trigger === "automatic"
+        && pending.automaticGeneration !== this.automaticFetchGeneration;
+      return (trigger === "manual" && pending.trigger === "automatic") || supersedesInvalidatedAutomatic
+        ? pending.promise.then(() => this.fetchAndCache(scope, targetUrl, preserveExisting, trigger))
+        : pending.promise;
+    }
+    const request = this.runFetchAndCache(
+      scope,
+      targetUrl,
+      preserveExisting,
+      trigger,
+      this.automaticFetchGeneration,
+      this.cacheGeneration,
+    );
+    this.pendingFetches.set(scope.key, {
+      promise: request,
+      trigger,
+      automaticGeneration: this.automaticFetchGeneration,
+    });
+    void request.finally(() => {
+      if (this.pendingFetches.get(scope.key)?.promise === request) this.pendingFetches.delete(scope.key);
+    });
     return request;
   }
 
-  private async runFetchAndCache(domain: string, targetUrl: string, preserveExisting: boolean) {
-    const previous = this.cache[domain];
+  private async runFetchAndCache(
+    scope: LinkScope,
+    targetUrl: string,
+    preserveExisting: boolean,
+    trigger: FetchTrigger,
+    automaticGeneration: number,
+    cacheGeneration: number,
+  ) {
+    const previous = this.cache[scope.key];
     let storedUrl: string | undefined;
     let stage = "resolve";
-    this.pendingDomains.add(domain);
+    let cacheUpdated = false;
+    let previousRemoved = false;
+    let discarded = false;
+    const invalidated = () => cacheGeneration !== this.cacheGeneration
+      || (trigger === "automatic" && (
+        automaticGeneration !== this.automaticFetchGeneration
+        || this.settings.pauseAutomaticFetch
+      ));
+    const ensureActive = () => {
+      if (!invalidated()) return;
+      discarded = true;
+      throw new Error("fetch result discarded because automatic retrieval or cache state changed");
+    };
+    this.pendingDomains.add(scope.key);
     await this.acquireFetchSlot();
     try {
-      const resolved = await resolveBestIcon(targetUrl, {
+      ensureActive();
+      const discoveryTarget = this.settings.allowFullPageDiscovery
+        ? safePageDiscoveryUrl(targetUrl)
+        : `https://${scope.domain}/`;
+      const resolved = await resolveBestIcon(discoveryTarget, {
         provider: this.settings.provider,
         providerPreset: this.settings.providerPreset,
         mode: this.settings.resolverMode,
         fallback: this.settings.fallbackMode,
-        monogramStyle: this.monogramStyleFor(domain),
+        monogramStyle: this.monogramStyleFor(scope.domain),
+        scope,
+        allowFullPageDiscovery: this.settings.allowFullPageDiscovery,
       });
+      ensureActive();
       if (!resolved) throw new Error("no usable icon source returned an image");
       const suffix = preserveExisting && previous ? `-refresh-${Date.now()}` : "";
       stage = "write";
-      const url = await this.storeIcon(domain, resolved.blob, suffix);
+      const url = await this.storeIcon(scope.key, resolved.blob, suffix);
       storedUrl = url;
+      ensureActive();
       stage = "verify-write";
       if (!await this.isStoredIconUsable(url)) {
         throw new Error("cached icon could not be loaded back from SiYuan");
       }
+      ensureActive();
       stage = "update-cache";
-      this.cache[domain] = {
+      this.cache[scope.key] = {
         url,
         fetchedAt: Date.now(),
         resolverVersion: RESOLVER_VERSION,
         source: resolved.source,
-        targetUrl: this.sanitizeTargetUrl(targetUrl, domain),
+        targetUrl: this.sanitizeTargetUrl(targetUrl, scope.domain),
+        domain: scope.domain,
+        routeKey: scope.routeKey,
+        pathPrefix: scope.pathPrefix,
       };
+      cacheUpdated = true;
       stage = "save-cache";
       try {
         await this.saveCache();
       } catch (error) {
-        if (previous) this.cache[domain] = previous;
-        else delete this.cache[domain];
+        if (previous) this.cache[scope.key] = previous;
+        else delete this.cache[scope.key];
         throw error;
       }
+      ensureActive();
       if (previous && previous.url !== url) {
         try {
           await this.removeCachedFile(previous.url);
+          previousRemoved = true;
         } catch (error) {
-          console.warn(`[auto-favicon] Unable to remove old cache for ${domain}`, error);
+          console.warn(`[auto-favicon] Unable to remove old cache for ${scope.key}`, error);
         }
       }
       stage = "apply";
       this.updateCacheCount();
-      this.failedDomains.delete(domain);
-      this.failureReasons.delete(domain);
-      this.setRule(domain, url, resolved.source);
+      this.failedDomains.delete(scope.key);
+      this.failureReasons.delete(scope.key);
+      this.setRule(scope, url, resolved.source);
       return true;
     } catch (error) {
       if (storedUrl && storedUrl !== previous?.url) {
@@ -1313,18 +1496,28 @@ export default class AutoFaviconPlugin extends Plugin {
           // Keep the original error as the useful diagnostic.
         }
       }
-      if (previous) this.cache[domain] = previous;
-      else delete this.cache[domain];
+      if (cacheGeneration === this.cacheGeneration) {
+        if (previous && !previousRemoved) this.cache[scope.key] = previous;
+        else delete this.cache[scope.key];
+        if (cacheUpdated) {
+          try {
+            await this.saveCache();
+          } catch {
+            // A later explicit cache operation remains authoritative.
+          }
+        }
+      }
       this.updateCacheCount();
-      console.warn(`[auto-favicon] Unable to cache ${domain}`, error);
-      this.failureReasons.set(domain, `${domain} · ${stage} · ${this.errorText(error)}`);
-      this.failedDomains.set(domain, Date.now());
+      if (discarded || invalidated()) return false;
+      console.warn(`[auto-favicon] Unable to cache ${scope.key}`, error);
+      this.failureReasons.set(scope.key, `${scope.key} · ${stage} · ${this.errorText(error)}`);
+      this.failedDomains.set(scope.key, Date.now());
       // Do not create a pseudo-element when no verified image exists. This
       // prevents an empty gap and lets link-icon keep its own valid icon.
       return false;
     } finally {
       this.releaseFetchSlot();
-      this.pendingDomains.delete(domain);
+      this.pendingDomains.delete(scope.key);
     }
   }
 
@@ -1382,20 +1575,21 @@ export default class AutoFaviconPlugin extends Plugin {
     return Date.now() - entry.fetchedAt <= maxAge;
   }
 
-  private async expireCachedDomain(domain: string, expected: CacheEntry) {
-    if (this.pendingDomains.has(domain)) return;
-    this.pendingDomains.add(domain);
+  private async expireCachedDomain(key: string, expected: CacheEntry) {
+    if (this.settings.pauseAutomaticFetch) return;
+    if (this.pendingDomains.has(key)) return;
+    this.pendingDomains.add(key);
     try {
-      if (this.cache[domain] !== expected) return;
+      if (this.cache[key] !== expected) return;
       await this.removeCachedFile(expected.url);
-      delete this.cache[domain];
-      this.iconRules.delete(domain);
+      delete this.cache[key];
+      this.iconRules.delete(key);
       this.renderRules();
       await this.saveCache();
       this.updateCacheCount();
     } finally {
-      this.pendingDomains.delete(domain);
-      this.scheduleScan();
+      this.pendingDomains.delete(key);
+      if (!this.settings.pauseAutomaticFetch) this.scheduleScan();
     }
   }
 
@@ -1403,14 +1597,22 @@ export default class AutoFaviconPlugin extends Plugin {
     this.iconRules.clear();
     let cacheChanged = false;
     if (this.settings.enabled) {
-      for (const [domain, entry] of Object.entries(this.cache)) {
-        const current = entry.pinned || entry.resolverVersion === RESOLVER_VERSION;
-        const fresh = this.isCacheEntryFresh(entry);
+      const entries = Object.entries(this.cache).sort(([a], [b]) => Number(a.includes("::")) - Number(b.includes("::")));
+      for (const [key, entry] of entries) {
+        if (entry.routeKey && this.cache[entry.domain ?? key.split("::")[0]]?.pinned) {
+          continue;
+        }
+        const pausedLegacyMonogram = this.settings.pauseAutomaticFetch
+          && entry.source === "generated monogram"
+          && entry.resolverVersion !== RESOLVER_VERSION;
+        const current = entry.pinned || entry.resolverVersion === RESOLVER_VERSION || pausedLegacyMonogram;
+        const fresh = this.settings.pauseAutomaticFetch || this.isCacheEntryFresh(entry);
         if (current && fresh && await this.isStoredIconUsable(entry.url)) {
-          this.iconRules.set(domain, this.createRule(domain, entry.url, entry.source));
+          const scope = scopeFromCacheKey(key, entry.domain, entry.pathPrefix);
+          this.iconRules.set(key, this.createRule(scope, entry.url, entry.source));
         } else {
           await this.removeCachedFile(entry.url);
-          delete this.cache[domain];
+          delete this.cache[key];
           cacheChanged = true;
         }
       }
@@ -1430,13 +1632,13 @@ export default class AutoFaviconPlugin extends Plugin {
     }
   }
 
-  private setRule(domain: string, url: string, source?: string) {
+  private setRule(scope: LinkScope, url: string, source?: string) {
     if (!this.settings.enabled) return;
-    this.iconRules.set(domain, this.createRule(domain, url, source));
+    this.iconRules.set(scope.key, this.createRule(scope, url, source));
     this.renderRules();
   }
 
-  private createRule(domain: string, iconUrl: string, source?: string) {
+  private createRule(scope: LinkScope, iconUrl: string, source?: string) {
     const selectors: string[] = [];
     const elements = [
       [".protyle-wysiwyg span[data-type~='a']", "data-href"],
@@ -1444,19 +1646,19 @@ export default class AutoFaviconPlugin extends Plugin {
       [".protyle-wysiwyg a", "href"],
       [".b3-typography a", "href"],
     ] as const;
-    for (const protocol of ["https", "http"]) {
-      const origin = `${protocol}://${domain}`;
+    for (const protocol of ["https", "http"] as const) {
+      const match = scopeMatchTarget(scope, protocol);
       for (const [element, attribute] of elements) {
-        selectors.push(`${element}[${attribute}=${this.cssString(origin)}]::before`);
-        for (const boundary of ["/", "?", "#", ":"]) {
-          selectors.push(`${element}[${attribute}^=${this.cssString(origin + boundary)}]::before`);
+        selectors.push(`${element}[${attribute}=${this.cssString(match.exact)}]::before`);
+        for (const boundary of match.boundaries) {
+          selectors.push(`${element}[${attribute}^=${this.cssString(match.exact + boundary)}]::before`);
         }
       }
     }
     // Smart mode keeps meaningful link-icon/theme icons, but replaces
     // link-icon's generic net2.svg placeholder. Auto mode gives a retrieved
     // favicon priority while still letting curated icons beat a monogram.
-    const smartFill = this.forceDomains.has(domain);
+    const smartFill = this.forceDomains.has(scope.key);
     const autoPriority = this.settings.linkIconMode === "auto" && source !== "generated monogram";
     const important = smartFill || autoPriority ? " !important" : "";
     const size = this.settings.iconSize;
@@ -1485,7 +1687,13 @@ export default class AutoFaviconPlugin extends Plugin {
       style.id = RUNTIME_STYLE_ID;
       document.head.appendChild(style);
     }
-    style.textContent = [...this.iconRules.values()].join("\n");
+    // Domain selectors intentionally come first. Route selectors are more
+    // specific semantically but use the same CSS specificity, so they must be
+    // rendered later to let /doc/ and /sheet/ coexist predictably.
+    style.textContent = [...this.iconRules.entries()]
+      .sort(([left], [right]) => Number(left.includes("::")) - Number(right.includes("::")))
+      .map(([, rule]) => rule)
+      .join("\n");
   }
 
   private async removeCachedFile(publicUrl: string) {

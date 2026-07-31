@@ -47,23 +47,54 @@ export type ResolverOptions = {
   mode: ResolverMode;
   fallback: FallbackMode;
   monogramStyle?: MonogramStyle;
+  scope?: LinkScope;
+  allowFullPageDiscovery?: boolean;
 };
 
 const MAX_ICON_BYTES = 2 * 1024 * 1024;
 const MAX_CANDIDATE_ATTEMPTS = 16;
 const MAX_CANDIDATE_RESULTS = 8;
+const MAX_PARENT_CANDIDATE_RESULTS = 3;
+const COMMON_SECOND_LEVEL_DOMAINS = new Set(["ac", "co", "com", "edu", "gov", "net", "org"]);
 
 export async function resolveBestIcon(targetUrl: string, options: ResolverOptions): Promise<ResolvedIcon | null> {
   const target = new URL(targetUrl);
   const domain = target.hostname.toLowerCase();
   if (!isSafePublicTarget(target)) return null;
-  const candidates = await collectCandidates(target, domain, options);
   const seen = new Set<string>();
-  for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
-    if (seen.has(candidate.url)) continue;
-    seen.add(candidate.url);
-    const blob = await downloadAndValidate(candidate.url);
-    if (blob) return { blob, source: candidate.source };
+  const scope = options.scope;
+  if (options.allowFullPageDiscovery) {
+    const pageResolved = await resolveCandidateGroup(await discoverPageIcons(target, target), seen);
+    if (pageResolved) return pageResolved;
+  }
+  if (scope?.platformIconUrl) {
+    const platformResolved = await resolveCandidateGroup([{
+      url: scope.platformIconUrl,
+      score: 200,
+      source: scope.platformIconSource ?? "platform type icon",
+    }], seen);
+    if (platformResolved) return platformResolved;
+  }
+  const rootTarget = new URL(`${target.protocol}//${domain}/`);
+  const rootResolved = await resolveCandidateGroup(await firstPartyCandidates(rootTarget), seen);
+  if (rootResolved) return rootResolved;
+  const parentDomain = parentDomainOf(domain);
+  if (parentDomain) {
+    const parentTarget = new URL(`${target.protocol}//${parentDomain}/`);
+    const parentResolved = await resolveCandidateGroup(
+      await firstPartyCandidates(parentTarget, parentSourcePrefix(parentDomain)),
+      seen,
+    );
+    if (parentResolved) return parentResolved;
+  }
+  const providerResolved = await resolveCandidateGroup(providerCandidates(domain, options), seen);
+  if (providerResolved) return providerResolved;
+  if (parentDomain) {
+    const parentProvider = await resolveCandidateGroup(
+      providerCandidates(parentDomain, options, parentSourcePrefix(parentDomain)),
+      seen,
+    );
+    if (parentProvider) return parentProvider;
   }
   return options.fallback === "monogram"
     ? { blob: createMonogram(domain, options.monogramStyle), source: "generated monogram" }
@@ -74,9 +105,74 @@ export async function discoverIconCandidates(targetUrl: string, options: Resolve
   const target = new URL(targetUrl);
   const domain = target.hostname.toLowerCase();
   if (!isSafePublicTarget(target)) return [];
-  const candidates = await collectCandidates(target, domain, options);
+  const scope = options.scope;
+  const rootTarget = new URL(`${target.protocol}//${domain}/`);
+  const exactCandidates: Candidate[] = [];
+  if (options.allowFullPageDiscovery) {
+    exactCandidates.push(...(await discoverPageIcons(target, target)).map((candidate) => ({
+      ...candidate,
+      score: candidate.score + 500,
+    })));
+  }
+  if (scope?.platformIconUrl) {
+    exactCandidates.push({
+      url: scope.platformIconUrl,
+      score: 200,
+      source: scope.platformIconSource ?? "platform type icon",
+    });
+  }
+  exactCandidates.push(...await firstPartyCandidates(rootTarget), ...providerCandidates(domain, options));
+  const parentDomain = parentDomainOf(domain);
+  const parentCandidates = parentDomain ? [
+    ...await firstPartyCandidates(new URL(`${target.protocol}//${parentDomain}/`), parentSourcePrefix(parentDomain)),
+    ...providerCandidates(parentDomain, options, parentSourcePrefix(parentDomain)),
+  ] : [];
   const seenUrls = new Set<string>();
   const seenContent = new Set<string>();
+  const exactResults = await validateCandidateGroup(
+    exactCandidates,
+    MAX_CANDIDATE_RESULTS,
+    seenUrls,
+    seenContent,
+  );
+  const parentResults = await validateCandidateGroup(
+    parentCandidates,
+    MAX_PARENT_CANDIDATE_RESULTS,
+    seenUrls,
+    seenContent,
+  );
+  return [
+    ...exactResults.slice(0, MAX_CANDIDATE_RESULTS - parentResults.length),
+    ...parentResults,
+  ];
+}
+
+export function parentDomainOf(domain: string) {
+  const normalized = domain.toLowerCase().replace(/^\[|\]$/g, "");
+  if (normalized.includes(":") || /^\d+(?:\.\d+){3}$/.test(normalized)) return null;
+  const labels = normalized.split(".");
+  if (labels.length < 3 || labels.some((label) => !label)) return null;
+  const parent = labels.slice(1);
+  if (parent.length === 2 && parent[1].length === 2 && COMMON_SECOND_LEVEL_DOMAINS.has(parent[0])) return null;
+  return parent.join(".");
+}
+
+async function resolveCandidateGroup(candidates: Candidate[], seen: Set<string>) {
+  for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
+    if (seen.has(candidate.url)) continue;
+    seen.add(candidate.url);
+    const blob = await downloadAndValidate(candidate.url);
+    if (blob) return { blob, source: candidate.source };
+  }
+  return null;
+}
+
+async function validateCandidateGroup(
+  candidates: Candidate[],
+  limit: number,
+  seenUrls: Set<string>,
+  seenContent: Set<string>,
+) {
   const results: ResolvedIconCandidate[] = [];
   let attempts = 0;
   for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
@@ -89,7 +185,7 @@ export async function discoverIconCandidates(targetUrl: string, options: Resolve
     if (seenContent.has(fingerprint)) continue;
     seenContent.add(fingerprint);
     results.push({ blob, source: candidate.source, url: candidate.url });
-    if (results.length >= MAX_CANDIDATE_RESULTS) break;
+    if (results.length >= limit) break;
   }
   return results;
 }
@@ -101,11 +197,14 @@ export async function resolveIconUrl(iconUrl: string): Promise<ResolvedIcon | nu
   return blob ? { blob, source: "custom URL" } : null;
 }
 
-async function collectCandidates(target: URL, domain: string, options: ResolverOptions) {
-  const candidates = await discoverPageIcons(target);
+async function firstPartyCandidates(target: URL, sourcePrefix = "") {
+  const candidates = await discoverPageIcons(target, target);
   candidates.push({ url: new URL("/favicon.ico", target.origin).href, score: 10, source: "root favicon.ico" });
-  candidates.push(...providerCandidates(domain, options));
-  return candidates;
+  return candidates.map((candidate) => ({ ...candidate, source: `${sourcePrefix}${candidate.source}` }));
+}
+
+function parentSourcePrefix(parentDomain: string) {
+  return `parent domain ${parentDomain} · `;
 }
 
 async function blobFingerprint(blob: Blob) {
@@ -115,9 +214,10 @@ async function blobFingerprint(blob: Blob) {
   return `${blob.type}:${blob.size}:${hash >>> 0}`;
 }
 
-async function discoverPageIcons(target: URL): Promise<Candidate[]> {
+async function discoverPageIcons(target: URL, requestedTarget: URL): Promise<Candidate[]> {
   const page = await forward(target.href, "text", "text/html");
   if (!page || page.status < 200 || page.status >= 300 || !page.body) return [];
+  if (isAuthenticationRedirect(requestedTarget, page.url)) return [];
 
   const baseUrl = page.url || target.href;
   const doc = new DOMParser().parseFromString(page.body, "text/html");
@@ -156,6 +256,7 @@ async function discoverPageIcons(target: URL): Promise<Candidate[]> {
 async function discoverManifestIcons(manifestUrl: string): Promise<Candidate[]> {
   const response = await forward(manifestUrl, "text", "application/manifest+json");
   if (!response || response.status < 200 || response.status >= 300) return [];
+  if (isAuthenticationRedirect(new URL(manifestUrl), response.url)) return [];
   try {
     const manifest = JSON.parse(response.body) as { icons?: Array<{ src?: string; sizes?: string; type?: string; purpose?: string }> };
     return (manifest.icons ?? []).flatMap((icon, index) => {
@@ -196,19 +297,15 @@ function scoreType(type: string) {
   return 0;
 }
 
-function providerCandidates(domain: string, options: ResolverOptions): Candidate[] {
+function providerCandidates(domain: string, options: ResolverOptions, sourcePrefix = ""): Candidate[] {
   if (options.mode === "direct") return [];
-  const rootDomain = domain.startsWith("www.") ? domain.slice(4) : domain;
   const candidates: Candidate[] = [];
   const addPreset = (preset: Exclude<ProviderPreset, "auto">, score: number) => {
-    candidates.push({ url: providerUrl(preset, domain, options.provider), score, source: providerName(preset) });
-    if (rootDomain !== domain) {
-      candidates.push({
-        url: providerUrl(preset, rootDomain, options.provider),
-        score: score - 0.25,
-        source: `${providerName(preset)} (root domain)`,
-      });
-    }
+    candidates.push({
+      url: providerUrl(preset, domain, options.provider),
+      score,
+      source: `${sourcePrefix}${providerName(preset)}`,
+    });
   };
 
   if (options.providerPreset === "auto") {
@@ -221,12 +318,12 @@ function providerCandidates(domain: string, options: ResolverOptions): Candidate
     candidates.push({
       url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`,
       score: 9,
-      source: "Google domain favicon",
+      source: `${sourcePrefix}Google domain favicon`,
     });
     candidates.push({
       url: `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`,
       score: 7,
-      source: "DuckDuckGo favicon",
+      source: `${sourcePrefix}DuckDuckGo favicon`,
     });
   }
   return candidates;
@@ -296,6 +393,7 @@ async function downloadAndValidate(url: string): Promise<Blob | null> {
   }
   const response = await forward(url, "base64", "application/octet-stream", 5000);
   if (!response || response.status < 200 || response.status >= 300 || !response.body) return null;
+  if (isAuthenticationRedirect(new URL(url), response.url)) return null;
   try {
     const bytes = base64ToBytes(response.body);
     if (!bytes.length || bytes.length > MAX_ICON_BYTES) return null;
@@ -390,3 +488,4 @@ function isSafePublicTarget(url: URL) {
   return !(a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168));
 }
+import { isAuthenticationRedirect, type LinkScope } from "./url-scope";

@@ -40,6 +40,13 @@
   border-radius: var(--b3-border-radius);
 }
 
+.auto-favicon-cache-domain-heading {
+  display: block;
+  padding: 9px 12px 5px;
+  color: var(--b3-theme-on-surface);
+  background: var(--b3-theme-surface);
+}
+
 .auto-favicon-cache-row {
   display: flex;
   align-items: center;

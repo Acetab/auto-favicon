@@ -1,0 +1,50 @@
+{
+  "checkedAt": "2026-07-31",
+  "purpose": "Reviewed public favicon endpoints used by privacy-safe office-platform route adapters.",
+  "sources": {
+    "tencent-doc": {
+      "url": "https://docs.gtimg.com/docs-design-resources/document-management/tencent-docs/favicon/application-vnd.tdocs-apps.doc.png",
+      "sha256": "928CDE9454DA4FF2B34832AB59A9CBF1CFB2506F8DAF1C316B5C683583C8C789"
+    },
+    "tencent-sheet": {
+      "url": "https://docs.gtimg.com/docs-design-resources/document-management/tencent-docs/favicon/application-vnd.tdocs-apps.sheet.png",
+      "sha256": "36D861F0F72D9252EA14555E7D19AF0F5E03BB41B3EEF8DA57E46F9A3FB4F0A8"
+    },
+    "tencent-slide": {
+      "url": "https://docs.gtimg.com/docs-design-resources/document-management/tencent-docs/favicon/application-vnd.tdocs-apps.slide.png",
+      "sha256": "68989AC48C8C50EBC311BDABBCFF0DDF9AA4DF1A959238E56C16EE404AD943C8"
+    },
+    "tencent-form": {
+      "url": "https://docs.gtimg.com/docs-design-resources/document-management/tencent-docs/favicon/application-vnd.tdocs-apps.form.png",
+      "sha256": "5490657AD5CEF66EB3066E01BE55021D31B3C1C66359E3B8ACFBC84E491F73C6"
+    },
+    "tencent-mind": {
+      "url": "https://docs.gtimg.com/docs-design-resources/document-management/tencent-docs/favicon/application-vnd.tdocs-apps.mind.png",
+      "sha256": "39AB2BBA2B21D3D372496ECB833FDA555DD14365C05DD905BEE096593611C530"
+    },
+    "tencent-desktop": {
+      "url": "https://docs.gtimg.com/desktop/favicon2.ico",
+      "sha256": "A41F0618D62D19D7907E4976A96985C6DD459984545DB5924524B4E2F1E5FF44"
+    },
+    "google-document": {
+      "url": "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico",
+      "sha256": "D40E9376B2F8C8FA5E0372C3DDACB5F6044539CF1D264BBCBEE8057DAF71ED96"
+    },
+    "google-spreadsheets": {
+      "url": "https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico",
+      "sha256": "B4407478DCD25903B7E3719CBD1A3FF42E1F51AE74D690BE7A7AF11E1964EF57"
+    },
+    "google-presentation": {
+      "url": "https://ssl.gstatic.com/docs/presentations/images/favicon5.ico",
+      "sha256": "F6458A567E44809E5E02A8585183C693BE0C092AEA8B7359669E56B761DCB820"
+    },
+    "google-forms": {
+      "url": "https://ssl.gstatic.com/docs/spreadsheets/forms/favicon_qp2.png",
+      "sha256": "D48A0F5A08249E1768C06ACA31C16D50D1216434E1C91BA322CF5521577A59E3"
+    },
+    "google-drawings": {
+      "url": "https://ssl.gstatic.com/docs/drawings/images/favicon5.ico",
+      "sha256": "9FEA566760E23830FB440B59122AFE4636A63E1997DBEAFC60A701BBE213B165"
+    }
+  }
+}
