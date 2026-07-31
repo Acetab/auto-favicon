@@ -953,11 +953,14 @@ export default class AutoFaviconPlugin extends Plugin {
     const status = document.createElement("div");
     status.className = "b3-label__text auto-favicon-picker-status";
     status.textContent = this.t("loadingCandidates");
+    const hint = document.createElement("div");
+    hint.className = "b3-label__text auto-favicon-picker-hint";
+    hint.textContent = this.t("candidateHint");
     const grid = document.createElement("div");
     grid.className = "auto-favicon-candidate-grid";
     root.append(controls);
     if (sharedDomain) root.append(shareRow);
-    root.append(status, grid);
+    root.append(hint, status, grid);
 
     let saving = false;
     const saveAndClose = async (blob: Blob, source: string) => {
@@ -1023,8 +1026,21 @@ export default class AutoFaviconPlugin extends Plugin {
           preview.src = objectUrl;
           preview.alt = candidate.source;
           const label = document.createElement("span");
+          label.className = "auto-favicon-candidate-source";
           label.textContent = candidate.source;
-          card.append(preview, label);
+          const details = document.createElement("small");
+          details.className = "auto-favicon-candidate-details";
+          const format = this.iconFormat(candidate.blob);
+          const size = this.formatFileSize(candidate.blob.size);
+          details.textContent = format === "SVG"
+            ? `${format} · ${this.t("vectorIcon")} · ${size}`
+            : `${format} · ${size}`;
+          preview.addEventListener("load", () => {
+            if (format !== "SVG" && preview.naturalWidth > 0 && preview.naturalHeight > 0) {
+              details.textContent = `${preview.naturalWidth}×${preview.naturalHeight} · ${format} · ${size}`;
+            }
+          }, { once: true });
+          card.append(preview, label, details);
           card.addEventListener("click", () => {
             void saveAndClose(candidate.blob, `selected candidate:${candidate.source}`);
           });
@@ -1037,6 +1053,26 @@ export default class AutoFaviconPlugin extends Plugin {
         this.releaseFetchSlot();
       }
     })();
+  }
+
+  private iconFormat(blob: Blob) {
+    const formats: Record<string, string> = {
+      "image/gif": "GIF",
+      "image/jpeg": "JPEG",
+      "image/png": "PNG",
+      "image/svg+xml": "SVG",
+      "image/vnd.microsoft.icon": "ICO",
+      "image/x-icon": "ICO",
+      "image/webp": "WEBP",
+    };
+    return formats[blob.type.toLowerCase()]
+      ?? (blob.type.replace(/^image\//, "").toUpperCase() || this.t("unknownIconFormat"));
+  }
+
+  private formatFileSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    const kilobytes = bytes / 1024;
+    return `${kilobytes < 10 ? kilobytes.toFixed(1) : Math.round(kilobytes)} KB`;
   }
 
   private clamp(value: number, min: number, max: number, fallback: number) {

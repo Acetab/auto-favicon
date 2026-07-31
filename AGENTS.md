@@ -48,8 +48,10 @@ complete marketplace payload in `dist/`.
 
 ## Current status
 
-- As of 2026-07-31, v0.5.4 fixes first-run caching in a clean workspace and has
-  passed real SiYuan validation.
+- As of 2026-07-31, v0.5.5 is the current release. It adds a before/after preview,
+  clearer custom-icon selection, and candidate icon metadata.
+- v0.5.4 fixed first-run caching in a clean workspace and passed real SiYuan
+  validation.
 - The release package uses forward-slash ZIP entry paths.
 - Missing plugin data can load as an empty string. Normalize loaded settings and
   cache values to plain objects before using them.

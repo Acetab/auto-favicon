@@ -31,6 +31,16 @@ Opening a document scans its web links, but a fresh cached icon is loaded locall
 
 Cache management supports refreshing the current document, refreshing every automatically cached domain, searching cached domains, and refreshing or deleting a single domain.
 
+## When an icon does not look right
+
+A website may publish several icons whose sharpness, padding, and borders vary by source. If an automatically retrieved icon is blurry, bordered, or otherwise unsuitable, open **Manage cache** from the top toolbar, find the domain, and select **Change icon**:
+
+- Choose from the candidates discovered by the plugin; each card shows pixel dimensions, format, and file size.
+- Upload a local image.
+- Enter a directly accessible image URL.
+
+A manually selected icon is pinned locally and is not replaced by normal refreshes, cache expiration, or **Clear all cache**. Select **Restore automatic retrieval** when you want the plugin to choose again.
+
 ## Working with Link Icon
 
 [Link Icon](https://github.com/chenshinshi/link-icon) is the marketplace name of the project whose repository name is `link-icon`. The recommended **Smart Fill** mode uses this priority:
@@ -68,16 +78,16 @@ The idea of displaying icons before links and the original need for this plugin 
 
 ## Recent updates
 
+### 0.5.5
+
+- Added a before-and-after preview that shows the effect of automatic website icons more clearly.
+- Made it clearer how to change and pin a discovered, local, or URL-based icon from cache management.
+- Show icon dimensions, format, and file size on candidate cards to help avoid blurry, bordered, or unsuitable variants.
+
 ### 0.5.4
 
 - Fixed all favicon refreshes failing on the first run in a new workspace.
 - Safely handle plugin settings and cache data that have not been created yet or contain an invalid value.
 - Show the domain, failure stage, and specific reason when a manual refresh fails.
-
-### 0.5.3
-
-- Added a community feedback entry for users who cannot conveniently access GitHub.
-- Enabled the custom service template only when Custom Service is selected.
-- Improved marketplace search keywords and updated build dependencies.
 
 See [GitHub Releases](https://github.com/Acetab/auto-favicon/releases) for the complete version history.

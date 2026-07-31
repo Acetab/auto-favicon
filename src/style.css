@@ -112,9 +112,16 @@
   flex: 0 0 auto;
 }
 
+.auto-favicon-picker-hint {
+  padding: 8px 10px;
+  color: var(--b3-theme-on-surface);
+  background: var(--b3-theme-surface);
+  border-radius: var(--b3-border-radius);
+}
+
 .auto-favicon-candidate-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
   min-height: 0;
   overflow: auto;
@@ -145,12 +152,19 @@
   object-fit: contain;
 }
 
-.auto-favicon-candidate-card span {
+.auto-favicon-candidate-source {
   width: 100%;
   overflow: hidden;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.auto-favicon-candidate-details {
+  color: var(--b3-theme-on-surface);
+  font-size: 0.82em;
+  line-height: 1.35;
+  text-align: center;
 }
 
 @media (max-width: 600px) {
