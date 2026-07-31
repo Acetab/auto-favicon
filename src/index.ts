@@ -57,7 +57,7 @@ const PUBLIC_DIR = "/data/public/auto-favicon";
 const PUBLIC_URL = "/public/auto-favicon";
 const RUNTIME_STYLE_ID = "auto-favicon-runtime-style";
 const FEEDBACK_URL = "https://ld246.com/article/1785052610863";
-const RESOLVER_VERSION = 5;
+const RESOLVER_VERSION = 6;
 const FAILURE_COOLDOWN = 10 * 60 * 1000;
 const MAX_CONCURRENT_FETCHES = 4;
 
@@ -1072,7 +1072,7 @@ export default class AutoFaviconPlugin extends Plugin {
     );
     root.append(controls);
     root.append(shareRow);
-    if (!this.settings.allowFullPageDiscovery) root.append(loadPageCandidates);
+    if (!this.settings.allowFullPageDiscovery && !selectedScope.discoverPage) root.append(loadPageCandidates);
     root.append(hint, status, grid);
 
     let saving = false;
@@ -1127,7 +1127,8 @@ export default class AutoFaviconPlugin extends Plugin {
       grid.replaceChildren();
       await this.acquireFetchSlot();
       try {
-        const discoveryTarget = allowFullPageDiscovery
+        const discoverPage = allowFullPageDiscovery || Boolean(selectedScope.discoverPage);
+        const discoveryTarget = discoverPage
           ? safePageDiscoveryUrl(targetUrl)
           : `https://${selectedScope.domain}/`;
         const candidates = await discoverIconCandidates(discoveryTarget, {
@@ -1137,7 +1138,7 @@ export default class AutoFaviconPlugin extends Plugin {
           fallback: this.settings.fallbackMode,
           monogramStyle: this.monogramStyleFor(domain),
           scope: selectedScope,
-          allowFullPageDiscovery,
+          allowFullPageDiscovery: discoverPage,
         });
         if (!root.isConnected) return;
         if (!urlButton.hasAttribute("disabled")) {
@@ -1181,7 +1182,7 @@ export default class AutoFaviconPlugin extends Plugin {
         loadPageCandidates.removeAttribute("disabled");
       }
     };
-    void loadCandidates(this.settings.allowFullPageDiscovery);
+    void loadCandidates(this.settings.allowFullPageDiscovery || Boolean(selectedScope.discoverPage));
   }
 
   private iconFormat(blob: Blob) {
@@ -1429,7 +1430,8 @@ export default class AutoFaviconPlugin extends Plugin {
     await this.acquireFetchSlot();
     try {
       ensureActive();
-      const discoveryTarget = this.settings.allowFullPageDiscovery
+      const discoverPage = this.settings.allowFullPageDiscovery || Boolean(scope.discoverPage);
+      const discoveryTarget = discoverPage
         ? safePageDiscoveryUrl(targetUrl)
         : `https://${scope.domain}/`;
       const resolved = await resolveBestIcon(discoveryTarget, {
@@ -1439,7 +1441,7 @@ export default class AutoFaviconPlugin extends Plugin {
         fallback: this.settings.fallbackMode,
         monogramStyle: this.monogramStyleFor(scope.domain),
         scope,
-        allowFullPageDiscovery: this.settings.allowFullPageDiscovery,
+        allowFullPageDiscovery: discoverPage,
       });
       ensureActive();
       if (!resolved) throw new Error("no usable icon source returned an image");

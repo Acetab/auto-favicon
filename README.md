@@ -8,8 +8,8 @@ Auto Favicon automatically retrieves, displays, and locally caches website icons
 
 ## Features
 
-- By default, discover icons from domain root pages, `/favicon.ico`, web manifests, and optional services without visiting paths that contain document IDs.
-- Recognize stable route types for Tencent Docs, Feishu/Lark, and Google Docs so documents, spreadsheets, and presentations on one domain can use different icons.
+- By default, discover icons from domain root pages, common root icon files (`/favicon.svg`, `/favicon.png`, `/apple-touch-icon.png`, and `/favicon.ico`), web manifests, and optional services without visiting paths that contain document IDs.
+- Recognize stable route types for Tencent Docs, Feishu/Lark, and Google Docs, plus public NoCode app deployment routes, so different sites or content types on one domain can use different icons.
 - Choose Standard Network, Proxy Network, or Direct Website Only.
 - Cache verified icons in the SiYuan workspace and reuse them without external requests.
 - Customize fallback monogram colors, letters, and shapes globally or per domain.
@@ -23,7 +23,7 @@ Auto Favicon automatically retrieves, displays, and locally caches website icons
 | Feature | Purpose |
 | --- | --- |
 | Automatically display website icons | Scan HTTP/HTTPS links in SiYuan documents and display an icon before each link. Disabling it stops display and automatic processing without deleting the cache. |
-| Route-type icons | Classify only the stable route types of supported platforms such as Tencent Docs, Feishu/Lark, and Google Docs, allowing documents, spreadsheets, and presentations on one domain to use different icons. Ordinary websites remain domain-scoped. |
+| Route-type icons | Classify only the stable route types of supported platforms such as Tencent Docs, Feishu/Lark, Google Docs, and NoCode, allowing different sites or content types on one domain to use different icons. Ordinary websites remain domain-scoped. |
 | Pause automatic retrieval | Prevent background network access and automatic rebuilding while testing or organizing the cache. Existing and expired entries remain visible, while manual refresh, replacement, and upload actions still work. |
 | Allow specific-page discovery | Off by default. Enable it only when a site declares different favicons for individual pages; requests go only to the original site and omit query parameters and fragments. |
 | Load page-specific candidates | Grant access to the current page for one candidate-loading action without changing the global setting. |
@@ -48,8 +48,8 @@ The plugin first looks for local pinned entries and cache records. It performs n
 4. Valid cache for the current route type.
 5. Valid cache for the current domain, also used as a temporary fallback before a type cache is created.
 6. Locally recognized office-platform type icon.
-7. The current domain root page's `rel=icon`, web app manifest icons, and `/favicon.ico`.
-8. The valid parent domain's page declarations, manifest, and `/favicon.ico`.
+7. The current domain root page's `rel=icon`, web app manifest icons, and common root icon files.
+8. The valid parent domain's page declarations, manifest, and common root icon files.
 9. Third-party favicon results for the current domain.
 10. Third-party favicon results for the parent domain.
 11. A locally generated colorful domain monogram.
@@ -69,7 +69,7 @@ Opening a document scans its web links, but a fresh cached icon is loaded locall
 - A failed manual refresh keeps the previous working icon.
 - Manually selected icons are pinned locally until automatic retrieval is restored; normal cache clearing and expiration do not remove them.
 - Icon files: `workspace/data/public/auto-favicon/`.
-- Cache index: `favicon-cache.json`, managed through SiYuan plugin storage. Normal entries retain only the domain; office-platform entries may also retain a stable type such as `doc`, `sheet`, or `base`, never a document ID, query, fragment, or title.
+- Cache index: `favicon-cache.json`, managed through SiYuan plugin storage. Normal entries retain only the domain; adapted-platform entries may also retain stable routes such as `doc`, `sheet`, `base`, or a public NoCode deployment identifier, never query parameters, fragments, or titles.
 - While automatic retrieval is paused, existing and expired entries remain visible and deleted entries are not rebuilt; manual refresh, candidate selection, and uploads remain available.
 
 Cache management supports refreshing the current document, refreshing every automatically cached domain, searching cached domains, and refreshing or deleting a single domain.
@@ -106,7 +106,7 @@ Pinned custom icons follow the same display strategy: Smart Fill still yields to
 - **Proxy Network:** Adds Google and DuckDuckGo for maximum coverage.
 - **Direct Website Only:** Contacts only current and valid parent domains, then uses a local fallback if needed.
 
-Automatic retrieval does not visit paths containing document IDs by default. Platform types are classified locally, and third-party services receive only the domain. The plugin sends a path without query parameters or fragments to the original site only when **Allow specific-page discovery** is enabled or the user clicks **Load page-specific candidates**. These requests contain no Cookie, Authorization, or Referer headers, and icons from authentication redirects are discarded.
+Automatic retrieval does not visit paths containing document IDs by default. Platform types are classified locally; to distinguish public NoCode deployments hosted on one domain, the plugin visits that app's deployment entry. Third-party services receive only the domain. Other paths are sent to the original site only when **Allow specific-page discovery** is enabled or the user clicks **Load page-specific candidates**. All path requests omit query parameters, fragments, Cookie, Authorization, and Referer headers, and icons from authentication redirects are discarded.
 
 Localhost, `.local`, loopback, link-local, and private IP addresses are not sent to favicon services. Third-party services never receive note content, anchor text, document paths, or tokens.
 
@@ -126,16 +126,15 @@ The idea of displaying icons before links and the original need for this plugin 
 
 ## Recent updates
 
+### 0.5.7
+
+- Keep public NoCode deployments on shared hosting domains in separate route-scoped caches and discover each app's declared favicon.
+- Probe common root icon files such as `/favicon.svg`, `/favicon.png`, and `/apple-touch-icon.png` before falling back to `/favicon.ico` or third-party services.
+
 ### 0.5.6
 
 - Stop visiting document-specific paths by default, with an explicit setting and one-time action for page-specific discovery.
 - Cache and display stable route types separately for Tencent Docs, Feishu/Lark, and Google Docs.
 - Add pause automatic retrieval, parent-domain fallback, and type-scoped pinned icons.
-
-### 0.5.5
-
-- Added a before-and-after preview that shows the effect of automatic website icons more clearly.
-- Made it clearer how to change and pin a discovered, local, or URL-based icon from cache management.
-- Show icon dimensions, format, and file size on candidate cards to help avoid blurry, bordered, or unsuitable variants.
 
 See [GitHub Releases](https://github.com/Acetab/auto-favicon/releases) for the complete version history.

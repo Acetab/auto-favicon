@@ -52,8 +52,8 @@ complete marketplace payload in `dist/`.
 
 ## Current status
 
-- As of 2026-07-31, v0.5.6 is the current release. It adds privacy-first
-  route-scoped icons, paused automatic retrieval, and explicit page discovery.
+- As of 2026-07-31, v0.5.7 is the current release. It separates public NoCode
+  deployments by route and probes common root SVG/PNG favicon files.
 - GitHub Actions run `30605537368` published v0.5.6 from `9b91217`; the online
   package, README image references, and reviewed PNG hashes were verified.
 - v0.5.5 added the before/after preview, clearer custom-icon selection, and

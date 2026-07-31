@@ -1,4 +1,4 @@
-export type PlatformFamily = "tencent-docs" | "feishu" | "google-docs";
+export type PlatformFamily = "tencent-docs" | "feishu" | "google-docs" | "nocode-host";
 
 export type LinkScope = {
   key: string;
@@ -8,6 +8,7 @@ export type LinkScope = {
   platform?: PlatformFamily;
   platformIconUrl?: string;
   platformIconSource?: string;
+  discoverPage?: boolean;
 };
 
 type RouteDefinition = {
@@ -86,6 +87,16 @@ export function scopeForUrl(value: string): LinkScope | null {
     const definition = route(segment, segment, platformTypeSvg("feishu", type));
     return routeScope(domain, "feishu", definition);
   }
+  if (domain === "nocode.host" && isNoCodeDeploymentSegment(segment)) {
+    return {
+      key: `${domain}::site-${segment}`,
+      domain,
+      routeKey: `site-${segment}`,
+      pathPrefix: `/${segment}`,
+      platform: "nocode-host",
+      discoverPage: true,
+    };
+  }
   return { key: domain, domain };
 }
 
@@ -156,6 +167,10 @@ function isFeishuDomain(domain: string) {
     || domain.endsWith(".feishu.cn")
     || domain === "larksuite.com"
     || domain.endsWith(".larksuite.com");
+}
+
+function isNoCodeDeploymentSegment(segment: string) {
+  return /^[a-z0-9]{6}$/.test(segment);
 }
 
 function platformTypeSvg(platform: PlatformFamily, type: string) {

@@ -199,7 +199,12 @@ export async function resolveIconUrl(iconUrl: string): Promise<ResolvedIcon | nu
 
 async function firstPartyCandidates(target: URL, sourcePrefix = "") {
   const candidates = await discoverPageIcons(target, target);
-  candidates.push({ url: new URL("/favicon.ico", target.origin).href, score: 10, source: "root favicon.ico" });
+  candidates.push(
+    { url: new URL("/favicon.svg", target.origin).href, score: 30, source: "root favicon.svg" },
+    { url: new URL("/favicon.png", target.origin).href, score: 20, source: "root favicon.png" },
+    { url: new URL("/apple-touch-icon.png", target.origin).href, score: 15, source: "root apple-touch-icon.png" },
+    { url: new URL("/favicon.ico", target.origin).href, score: 10, source: "root favicon.ico" },
+  );
   return candidates.map((candidate) => ({ ...candidate, source: `${sourcePrefix}${candidate.source}` }));
 }
 
